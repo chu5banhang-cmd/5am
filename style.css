@@ -1,0 +1,67 @@
+/* style.css - Giao diện Pixel Art Sài Gòn Hoài Cổ (Warm Vintage Palette) */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    user-select: none;
+}
+
+body {
+    background-color: #1c1410;
+    background-image: 
+        radial-gradient(#2e211a 1px, transparent 1px),
+        radial-gradient(#241a14 1px, #1c1410 1px);
+    background-size: 16px 16px;
+    background-position: 0 0, 8px 8px;
+    color: #f5e6d3;
+    font-family: 'Chakra Petch', 'Courier New', monospace;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.game-container {
+    position: relative;
+    border: 4px solid #6e4736;
+    outline: 4px solid #2b1d16;
+    background-color: #2b1d16;
+    box-shadow: 
+        0 0 0 8px #3d291e,
+        0 20px 55px rgba(0, 0, 0, 0.85);
+}
+
+canvas {
+    display: block;
+    background: #2b1d16;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-crisp-edges;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+#playerNameInput {
+    position: absolute;
+    top: 122px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 260px;
+    padding: 8px 14px;
+    font-family: 'Chakra Petch', monospace;
+    font-weight: 700;
+    font-size: 17px;
+    text-align: center;
+    border: 3px solid #2b1d16;
+    box-shadow: 4px 4px 0px #2b1d16;
+    background-color: #ecd3ab;
+    color: #2b1d16;
+    outline: none;
+    display: none;
+    z-index: 10;
+}
+
+#playerNameInput:focus {
+    background-color: #fff6e5;
+    border-color: #c84b31;
+}
