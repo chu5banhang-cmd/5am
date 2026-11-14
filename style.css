@@ -7,12 +7,13 @@
 }
 
 body {
-    background-color: #1c1410;
-    background-image: 
-        radial-gradient(#2e211a 1px, transparent 1px),
-        radial-gradient(#241a14 1px, #1c1410 1px);
-    background-size: 16px 16px;
-    background-position: 0 0, 8px 8px;
+    background-color: #171820;
+    background-image:
+        radial-gradient(ellipse at 50% 42%, rgba(110, 69, 70, 0.32), transparent 58%),
+        radial-gradient(#353039 1px, transparent 1px),
+        radial-gradient(#211f29 1px, #171820 1px);
+    background-size: auto, 16px 16px, 16px 16px;
+    background-position: center, 0 0, 8px 8px;
     color: #f5e6d3;
     font-family: 'Chakra Petch', 'Courier New', monospace;
     display: flex;
@@ -24,44 +25,91 @@ body {
 
 .game-container {
     position: relative;
-    border: 4px solid #6e4736;
-    outline: 4px solid #2b1d16;
-    background-color: #2b1d16;
-    box-shadow: 
-        0 0 0 8px #3d291e,
-        0 20px 55px rgba(0, 0, 0, 0.85);
+    border: 4px solid #d9ad62;
+    outline: 4px solid #38292b;
+    background-color: #27232c;
+    box-shadow:
+        0 0 0 7px #765041,
+        0 0 0 11px #241f27,
+        0 22px 70px rgba(0, 0, 0, 0.72),
+        inset 0 0 0 2px rgba(255, 231, 187, 0.28);
+    image-rendering: pixelated;
 }
 
 canvas {
     display: block;
-    background: #2b1d16;
+    background: #292632;
     image-rendering: -moz-crisp-edges;
     image-rendering: -webkit-crisp-edges;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
+    cursor: pointer;
 }
 
-#playerNameInput {
+#playerFormFields {
     position: absolute;
-    top: 122px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 260px;
-    padding: 8px 14px;
-    font-family: 'Chakra Petch', monospace;
-    font-weight: 700;
-    font-size: 17px;
-    text-align: center;
-    border: 3px solid #2b1d16;
-    box-shadow: 4px 4px 0px #2b1d16;
-    background-color: #ecd3ab;
-    color: #2b1d16;
-    outline: none;
+    top: 135px;
+    left: 344px;
+    width: 533px;
     display: none;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
     z-index: 10;
 }
 
+.player-field,
+#playerBirthdayField {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: #6a5147;
+    font: 700 12px 'Chakra Petch', monospace;
+}
+
+.player-field label,
+#playerBirthdayField label {
+    line-height: 15px;
+}
+
+#playerBirthdayField[hidden] {
+    display: none;
+}
+
+#playerNameInput {
+    position: static;
+    transform: none;
+    width: 100%;
+    height: 37px;
+    padding: 6px 10px;
+    font-family: 'Chakra Petch', monospace;
+    font-weight: 700;
+    font-size: 15px;
+    text-align: center;
+    border: 2px solid #52372f;
+    box-shadow: 3px 3px 0 #34262a, inset 0 2px 0 rgba(255, 255, 255, 0.48);
+    background-color: #fff1d3;
+    color: #3d2a2b;
+    outline: none;
+}
+
 #playerNameInput:focus {
-    background-color: #fff6e5;
-    border-color: #c84b31;
+    background-color: #fff9e9;
+    border-color: #b85d45;
+}
+
+#playerBirthdayField span {
+    color: #90745f;
+    font-weight: 600;
+}
+
+#playerBirthdayInput {
+    width: 100%;
+    height: 37px;
+    padding: 5px 9px;
+    border: 2px solid #52372f;
+    box-shadow: 3px 3px 0 #34262a, inset 0 2px 0 rgba(255, 255, 255, 0.48);
+    background: #fff6e5;
+    color: #3d2a2b;
+    font: 700 15px 'Chakra Petch', monospace;
 }
