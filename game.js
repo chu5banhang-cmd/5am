@@ -249,6 +249,7 @@ let coffeeCart = {
     x: 1110,
     y: 382,
     isPushed: false,
+    isOpen: true,
     umbrella: false,
     seating: false
 };
@@ -300,16 +301,17 @@ let keys = {
 };
 
 function isAnyModalOpen() {
-    return !!(showTVModal || showHandbookModal || showManagementModal || showBankModal || showGarage || showShopMenu || showFestivalPanel || showWallCalendar || showNPCSchedule || showMapModal || selectedRentalModal || showMarketModal || showBrewModal || showSleepSummaryModal || activeDialogueNPC);
+    return !!(showTVModal || showHandbookModal || showDeliveryModal || showManagementModal || showBankModal || showGarage || showShopMenu || showFestivalPanel || showWallCalendar || showNPCSchedule || showMapModal || selectedRentalModal || showMarketModal || showBrewModal || showSleepSummaryModal || activeDialogueNPC);
 }
 
 function isTimePausedModalOpen() {
-    return !!(showTVModal || showHandbookModal || showManagementModal || showBankModal || showGarage || showShopMenu || showFestivalPanel || showWallCalendar || showNPCSchedule || showMapModal || selectedRentalModal || showMarketModal || showSleepSummaryModal || activeDialogueNPC);
+    return !!(showTVModal || showHandbookModal || showDeliveryModal || showManagementModal || showBankModal || showGarage || showShopMenu || showFestivalPanel || showWallCalendar || showNPCSchedule || showMapModal || selectedRentalModal || showMarketModal || showSleepSummaryModal || activeDialogueNPC);
 }
 
 function closeAllModals() {
     showTVModal = false;
     showHandbookModal = false;
+    showDeliveryModal = false;
     showManagementModal = false;
     showBankModal = false;
     showGarage = false;
@@ -412,6 +414,24 @@ window.addEventListener('keydown', function (e) {
             }
             return;
         }
+        if (low === 'f' && !e.repeat && !indoorShop) {
+            if (!hasDeliveryVehicle()) return;
+            if (showDeliveryModal) {
+                showDeliveryModal = false;
+                GameAudio?.playModalClose();
+            } else {
+                closeAllModals();
+                if (!deliveryOffers.length) generateDeliveryOffers();
+                showDeliveryModal = true;
+                GameAudio?.playModalOpen();
+            }
+            return;
+        }
+        if (showDeliveryModal && (low === 'q' || e.key === 'Escape')) {
+            showDeliveryModal = false;
+            GameAudio?.playModalClose();
+            return;
+        }
         if (showHandbookModal) {
             if (low === '1') {
                 handbookTab = 'guide';
@@ -435,11 +455,17 @@ window.addEventListener('keydown', function (e) {
                 if (isAnyModalOpen()) closeAllModals();
                 else leaveShop();
             } else if (low === 'e' && activeDialogueNPC) advanceDialogue();
-            else if (low === 'e' && !isAnyModalOpen() && player.y >= 368 && player.y <= 465) {
-                const visitor = getShopVisitors(indoorShop).find((npc, index) => Math.abs(player.x - (341 + index * 142)) < 57);
+            else if (low === 'e' && !isAnyModalOpen() && indoorShop.nightlife && indoorShop.name.includes("SKYLINE") && player.y < 315 && player.x >= 325 && player.x <= 450) {
+                const kyDuyen = getShopVisitors(indoorShop).find((npc) => npc.id === 'ky_duyen');
+                if (kyDuyen) openNPCDialogue(kyDuyen);
+            } else if (low === 'e' && !isAnyModalOpen() && player.y >= 368 && player.y <= 465) {
+                const floorVisitors = indoorShop.nightlife && indoorShop.name.includes("SKYLINE")
+                    ? getShopVisitors(indoorShop).filter((npc) => npc.id !== 'ky_duyen')
+                    : getShopVisitors(indoorShop);
+                const visitor = floorVisitors.find((npc, index) => Math.abs(player.x - getShopVisitorX(index, floorVisitors.length)) < 52);
                 if (visitor) openNPCDialogue(visitor);
             } else if (low === 'e' && !isAnyModalOpen() && player.y < 315 &&
-                player.x >= 320 && player.x <= 670) useShopCounter();
+                player.x >= (indoorShop.nightlife ? 530 : 320) && player.x <= (indoorShop.nightlife ? 775 : 670)) useShopCounter();
             else if (showBrewModal && /^[1-3]$/.test(low)) brewAndSellDrink(GAME_CONFIG.RECIPES[Number(low) - 1]);
             return;
         }
@@ -467,6 +493,8 @@ window.addEventListener('keydown', function (e) {
             showMapModal = nextState;
         } else if (low === 'g' && currentGameState === GAME_STATES.PLAYING_STREET && !isAnyModalOpen()) {
             togglePushCoffeeCart();
+        } else if (low === 'c' && !e.repeat && currentGameState === GAME_STATES.PLAYING_STREET && (!isAnyModalOpen() || (showBrewModal && activeBrewSpot?.spotId === 'cart_mobile'))) {
+            toggleCoffeeCartOpen();
         } else if (low === 'h' && !e.repeat && currentGameState === GAME_STATES.PLAYING_STREET && !isAnyModalOpen()) {
             if (ridingBicycle || activeVehicle?.id === 'bike') GameAudio?.playBikeBell(0.24);
             else if (activeVehicle) GameAudio?.playHorn(0, 0.22);
@@ -788,14 +816,26 @@ function getNPCSchedule(homeZone, rosterIndex) {
         end: startHours[index + 1] ?? GAME_CONFIG.TIME.SLEEP_PENALTY_LIMIT,
         spot: npcMeetingSpots[(rosterIndex + phase + index) % npcMeetingSpots.length]
     }));
-    const appointment = shopAppointments[npc.id];
-    if (!appointment) return schedule;
-    const [zone, name, start, end] = appointment;
-    const shop = shopsByZone[zone]?.find((entry) => entry.name.includes(name));
-    if (!shop) return schedule;
-    const before = schedule.filter((slot) => slot.start < start).map((slot) => ({ ...slot, end: Math.min(slot.end, start) }));
-    const after = schedule.filter((slot) => slot.end > end).map((slot) => ({ ...slot, start: Math.max(slot.start, end) }));
-    return [...before, { start, end, zone, shop, spot: { x: shop.x, y: shop.y, label: name } }, ...after];
+    const rawAppt = shopAppointments[npc.id];
+    if (!rawAppt) return schedule;
+    const appts = Array.isArray(rawAppt[0]) ? rawAppt : [rawAppt];
+    let result = schedule;
+    for (const [zone, name, start, end] of appts) {
+        const shop = shopsByZone[zone]?.find((entry) => entry.name.includes(name));
+        if (!shop) continue;
+        const next = [];
+        for (const slot of result) {
+            if (slot.end <= start || slot.start >= end) {
+                next.push(slot);
+            } else {
+                if (slot.start < start) next.push({ ...slot, end: start });
+                if (slot.end > end) next.push({ ...slot, start: end });
+            }
+        }
+        next.push({ start, end, zone, shop, spot: { x: shop.x, y: shop.y, label: name } });
+        result = next.sort((a, b) => a.start - b.start);
+    }
+    return result;
 }
 
 function toggleNPCSchedule() {
@@ -1206,7 +1246,7 @@ function drawChibiFace(dir, isFemale, hairShape) {
     }
 }
 
-function drawBitmapCharacter(x, y, config, dir = 'down', animFrame = 0, isMoving = false, scale = 1.45) {
+function drawBitmapCharacter(x, y, config, dir = 'down', animFrame = 0, isMoving = false, scale = 1.45, isSeated = false) {
     const outfit = config.outfits[config.outfitIndex];
     const featured = config.look && ['ribbon', 'baker', 'cardigan', 'blazer', 'suit', 'dress', 'utility', 'stage', 'dj'].includes(config.look[6]);
     const accType = featured ? 'none' : config.accessories[config.accessoryIndex].type;
@@ -1216,19 +1256,20 @@ function drawBitmapCharacter(x, y, config, dir = 'down', animFrame = 0, isMoving
     const skins = [['#ffd0a7', '#d9a17c'], ['#ecaa7f', '#bc7958'], ['#c98a62', '#9b5d44']];
     const [skinLight, skinShade] = skins[skin] || ['#f2b488', '#d99568'];
 
+    const effectiveMoving = isSeated ? false : isMoving;
     let matrix = SPRITE_DOWN_IDLE;
     let flipX = false;
 
     if (dir === 'down') {
-        if (isMoving && animFrame === 1) matrix = SPRITE_DOWN_WALK1;
-        else if (isMoving && animFrame === 3) matrix = SPRITE_DOWN_WALK2;
+        if (effectiveMoving && animFrame === 1) matrix = SPRITE_DOWN_WALK1;
+        else if (effectiveMoving && animFrame === 3) matrix = SPRITE_DOWN_WALK2;
         else matrix = SPRITE_DOWN_IDLE;
     } else if (dir === 'up') {
         matrix = SPRITE_UP_IDLE;
     } else if (dir === 'right') {
-        matrix = (isMoving && (animFrame === 1 || animFrame === 3)) ? SPRITE_SIDE_WALK1 : SPRITE_SIDE_IDLE;
+        matrix = (effectiveMoving && (animFrame === 1 || animFrame === 3)) ? SPRITE_SIDE_WALK1 : SPRITE_SIDE_IDLE;
     } else if (dir === 'left') {
-        matrix = (isMoving && (animFrame === 1 || animFrame === 3)) ? SPRITE_SIDE_WALK1 : SPRITE_SIDE_IDLE;
+        matrix = (effectiveMoving && (animFrame === 1 || animFrame === 3)) ? SPRITE_SIDE_WALK1 : SPRITE_SIDE_IDLE;
         flipX = true;
     }
 
@@ -1248,11 +1289,16 @@ function drawBitmapCharacter(x, y, config, dir = 'down', animFrame = 0, isMoving
         'k': '#8c827a'
     };
 
-    const bobY = (isMoving && (animFrame === 1 || animFrame === 3)) ? -1 : 0;
+    const bobY = (effectiveMoving && (animFrame === 1 || animFrame === 3)) ? -1 : 0;
 
     ctx.save();
     ctx.translate(Math.round(x), Math.round(y));
     if (scale !== 1) ctx.scale(scale, scale);
+    if (isSeated) {
+        ctx.beginPath();
+        ctx.rect(-8, -12, 40, 41);
+        ctx.clip();
+    }
     if (look) {
         ctx.translate(12, 34);
         ctx.scale(bodyWidth, bodyHeight);
@@ -1261,7 +1307,7 @@ function drawBitmapCharacter(x, y, config, dir = 'down', animFrame = 0, isMoving
         drawNPCBackHair(hairShape, hair, flipX, bobY);
     }
 
-    pRect(ctx, 6, 33, 12, 4, "rgba(29, 25, 26, 0.16)");
+    if (!isSeated) pRect(ctx, 6, 33, 12, 4, "rgba(29, 25, 26, 0.16)");
     pRect(ctx, 4, 34, 16, 3, "rgba(29, 25, 26, 0.27)");
     pRect(ctx, 7, 35, 10, 2, "rgba(29, 25, 26, 0.14)");
 
@@ -1688,12 +1734,10 @@ const shopMenus = [
     [/TIỆM CÁ/, [['Bánh mì chả cá', 24000, 'energy', 31]]],
     [/TIỆM CHÈ/, [['Chè đậu xanh', 20000, 'energy', 27]]],
     [/CHỢ KÊNH|TẠP HÓA VEN KÊNH/, [['Hạt cà phê rang (5 phần)', 45000, 'coffee', 5], ['Trái cây (5 phần)', 50000, 'fruit', 5]]],
-    [/QUÁN NƯỚNG/, [['Xiên nướng', 40000, 'energy', 42]]],
-    [/ỐC ĐÊM/, [['Ốc xào sả', 45000, 'energy', 48]]],
-    [/LẨU/, [['Lẩu chua', 70000, 'energy', 65]]],
+    [/QUÁN NƯỚNG/, [['Xiên nướng', 40000, 'energy', 42], ['Ba chỉ nướng sa tế', 55000, 'energy', 56]]],
+    [/ỐC|LẨU/, [['Ốc xào sả', 45000, 'energy', 48], ['Lẩu chua hải sản', 70000, 'energy', 65]]],
     [/BIA SÂN THƯỢNG/, [['Đậu phộng rang', 22000, 'energy', 20]]],
-    [/NEON BAR/, [['Soda tắc', 32000, 'energy', 26]]],
-    [/CLUB MƯA ĐÊM/, [['Nước chanh bạc hà', 35000, 'energy', 30]]],
+    [/NEON|CLUB MƯA ĐÊM/, [['Soda tắc', 32000, 'energy', 26], ['Nước chanh bạc hà', 35000, 'energy', 30]]],
     [/TIỆM MAY/, [
         ['Sơ mi may đo màu chàm', 145000, 'outfit', { color: '#526a91', shadow: '#324360', shorts: '#b39a79', cut: 'shirt' }],
         ['Áo khoác may đo màu rêu', 195000, 'outfit', { color: '#64805c', shadow: '#3d5339', shorts: '#353738', cut: 'jacket' }],
@@ -1705,18 +1749,42 @@ const shopMenus = [
     ]]
 ];
 const shopAppointments = {
-    my_linh: ['HOME_STREET', 'QUÁN ĂN SÁNG', 6, 9],
-    anh_phuc: ['HOME_STREET', 'TIỆM SỬA XE', 9, 12],
-    phuong_vy: ['BETTER_STREET', "L'AMOUR", 7, 10],
-    duc_anh: ['BETTER_STREET', 'HIỆU SÁCH', 10, 13],
-    co_mai: ['BETTER_STREET', 'TIỆM HOA', 9, 12],
-    thu_trang: ['OFFICE_DISTRICT', 'CƠM TRƯA', 11, 14],
-    duc_tin: ['OFFICE_DISTRICT', 'CƠM TRƯA', 12, 14],
-    co_huong: ['ELDERLY_AREA', 'TIỆM ĐỒ CỔ', 10, 14],
-    ong_khai: ['DOWNTOWN', 'SHOWROOM', 10, 14],
-    ky_duyen: ['DISTRICT_1', 'SKYLINE', 21, 23],
-    mai_anh: ['DISTRICT_1', 'ỐC ĐÊM', 18, 22],
-    tuan_vu: ['DISTRICT_1', 'NEON BAR', 19, 22]
+    // 35 nhân vật: ban ngày đi chợ/làm việc; buổi tối ~23 người đi tụ điểm đêm Q.1, ~12 người ở lại khu nhà nghỉ ngơi
+    be_ut:         ['HOME_STREET', 'CÔ BA', 6, 9],
+    anh_hung:      [['HOME_STREET', 'TIỆM SỬA XE', 8, 11], ['DISTRICT_1', 'BIA SÂN THƯỢNG', 18, 22]],
+    phuong_vy:     ['BETTER_STREET', "L'AMOUR", 7, 11],
+    duc_anh:       [['BETTER_STREET', 'HIỆU SÁCH', 10, 14], ['DISTRICT_1', 'SKYLINE', 21, 23]],
+    bao_ngoc:      [['OFFICE_DISTRICT', 'VĂN PHÒNG', 9, 12], ['DISTRICT_1', 'SKYLINE', 21, 24]],
+    sep_hoang:     [['OFFICE_DISTRICT', 'VIETBANK', 9, 12], ['DISTRICT_1', 'SKYLINE', 21, 24]],
+    thao_nhi:      [['DOWNTOWN', 'SAIGON CHIC', 13, 16], ['DISTRICT_1', 'QUÁN NƯỚNG', 18, 21]],
+    nhiep_anh_lam: [['DOWNTOWN', 'NHÀ SÁCH', 10, 13], ['DISTRICT_1', 'NEON MƯA ĐÊM', 20, 23]],
+    ky_duyen:      [['DOWNTOWN', 'SAIGON CHIC', 15, 18], ['DISTRICT_1', 'SKYLINE', 21, 24]],
+    dj_ken:        [['DOWNTOWN', 'TIỆM GIÀY', 14, 17], ['DISTRICT_1', 'NEON MƯA ĐÊM', 19, 24]],
+    chu_tu:        ['CANAL_MARKET', 'TIỆM GẠO', 7, 10],
+    my_linh:       [['HOME_STREET', 'QUÁN ĂN SÁNG', 6, 9], ['DISTRICT_1', 'QUÁN NƯỚNG', 18, 22]],
+    anh_phuc:      [['HOME_STREET', 'TIỆM SỬA XE', 9, 13], ['DISTRICT_1', 'BIA SÂN THƯỢNG', 19, 23]],
+    co_mai:        ['BETTER_STREET', 'TIỆM HOA', 8, 12],
+    bao_nam:       [['DOWNTOWN', 'TIỆM MAY', 10, 14], ['DISTRICT_1', 'NEON MƯA ĐÊM', 20, 23]],
+    ong_khai:      [['DOWNTOWN', 'SHOWROOM', 10, 14], ['DISTRICT_1', 'SKYLINE', 21, 23]],
+    ha_vy:         [['DOWNTOWN', 'TIỆM TRANG SỨC', 13, 16], ['DISTRICT_1', 'SKYLINE', 21, 24]],
+    minh_khoa:     [['OFFICE_DISTRICT', 'VĂN PHÒNG', 13, 16], ['DISTRICT_1', 'QUÁN NƯỚNG', 18, 22]],
+    lan_chi:       [['DOWNTOWN', 'SAIGON CHIC', 11, 15], ['DISTRICT_1', 'NHÀ HÁT', 19, 22]],
+    quoc_huy:      [['OFFICE_DISTRICT', 'CƠM TRƯA', 11, 14], ['DISTRICT_1', 'BIA SÂN THƯỢNG', 18, 22]],
+    thu_trang:     [['OFFICE_DISTRICT', 'CƠM TRƯA', 11, 14], ['DISTRICT_1', 'ỐC & LẨU', 18, 21]],
+    duc_tin:       [['OFFICE_DISTRICT', 'CƠM TRƯA', 12, 15], ['DISTRICT_1', 'QUÁN NƯỚNG', 19, 22]],
+    anh_thao:      ['BETTER_STREET', "L'AMOUR", 14, 17],
+    bac_nam:       [['ELDERLY_AREA', 'AN LẠC TRÀ ĐẠO', 8, 11], ['CANAL_MARKET', 'TIỆM CHÈ', 15, 17]],
+    yen_nhi:       [['DOWNTOWN', 'TIỆM GIÀY', 14, 17], ['DISTRICT_1', 'NEON MƯA ĐÊM', 20, 24]],
+    mai_anh:       [['OFFICE_DISTRICT', 'VIETBANK', 13, 16], ['DISTRICT_1', 'ỐC & LẨU', 18, 22]],
+    tuan_vu:       [['DOWNTOWN', 'SHOWROOM', 14, 17], ['DISTRICT_1', 'NEON MƯA ĐÊM', 19, 23]],
+    ong_bay:       [['ELDERLY_AREA', 'TIỆM TRÀ', 7, 11], ['ELDERLY_AREA', 'AN LẠC TRÀ ĐẠO', 14, 17]],
+    ba_sau:        [['HOME_STREET', 'CÔ BA', 6, 9], ['ELDERLY_AREA', 'TIỆM TRÀ', 15, 18]],
+    bac_son:       ['ELDERLY_AREA', 'TIỆM ĐỒ CỔ', 9, 12],
+    co_huong:      [['ELDERLY_AREA', 'TIỆM ĐỒ CỔ', 10, 14], ['ELDERLY_AREA', 'TIỆM TRÀ', 16, 19]],
+    nhat_long:     [['CANAL_MARKET', 'HỦ TIẾU', 7, 10], ['DISTRICT_1', 'ỐC & LẨU', 18, 22]],
+    thao_vy:       ['BETTER_STREET', 'HIỆU SÁCH', 13, 16],
+    chi_man:       ['CANAL_MARKET', 'TIỆM CÁ', 6, 10],
+    gia_bao:       [['BREEZE_AREA', 'THUÊ XE ĐẠP', 15, 18], ['DISTRICT_1', 'NEON MƯA ĐÊM', 20, 23]]
 };
 const purchasedGifts = [];
 let showShopMenu = false;
@@ -1873,6 +1941,11 @@ function getShopVisitors(shop) {
         .some((slot) => slot.shop === shop && playerStats.hour >= slot.start && playerStats.hour < slot.end));
 }
 
+function getShopVisitorX(index, total) {
+    if (total <= 3) return 341 + index * 142;
+    return Math.round(270 + index * (430 / (total - 1)));
+}
+
 const shopsByZone = {};
 let indoorShop = null;
 let outdoorPosition = null;
@@ -1884,9 +1957,9 @@ function getShopHours(title, rental) {
     if (/SỬA XE/.test(title)) return [7, 18];
     if (/TẠP HÓA VEN KÊNH|TIỆM CHÈ/.test(title)) return [5, 18];
     if (title.includes("CÔ BA")) return [5, GAME_CONFIG.TIME.MARKET_CLOSE_HOUR];
+    if (/NEON MƯA ĐÊM|BAR/.test(title)) return [19, 24];
     if (/CLUB|LOUNGE/.test(title)) return [21, 24];
-    if (/BAR/.test(title)) return [19, 24];
-    if (/NƯỚNG|ỐC ĐÊM|LẨU|BIA|NHÀ HÁT/.test(title)) return [16, 24];
+    if (/NƯỚNG|ỐC|LẨU|BIA|NHÀ HÁT/.test(title)) return [16, 24];
     if (/BÁNH|CHỢ KÊNH|HỦ TIẾU|TIỆM CÁ|TIỆM GẠO/.test(title)) return [5, 18];
     if (/XE ĐẠP/.test(title)) return [6, 19];
     if (/NGÂN HÀNG|CAO ỐC|VĂN PHÒNG/.test(title)) return [8, 17];
@@ -1980,15 +2053,16 @@ function drawManagementModal() {
     const shop = selectedManagementShop;
     const business = currentBusiness();
     const upgrades = business?.upgrades || (business ? (business.upgrades = {}) : {});
+    const hasStaff = Boolean(business?.hasStaff);
     pRect(ctx, 0, 0, canvas.width, canvas.height, "rgba(20,14,10,0.8)");
-    pOutlinedRect(ctx, 170, 90, 660, 470, "#ecd3ab");
+    pOutlinedRect(ctx, 170, 82, 660, 496, "#ecd3ab");
     ctx.textAlign = "center"; ctx.fillStyle = PAL.OUTLINE;
     ctx.font = "bold 20px 'Chakra Petch', sans-serif";
-    ctx.fillText("Quản lý cửa hàng", 500, 128);
+    ctx.fillText("Quản lý cửa hàng", 500, 120);
     ctx.font = "bold 13px 'Chakra Petch', sans-serif";
-    ctx.fillText(`Uy tín quán ${customerReputation}/100 · Danh tiếng thành phố ${cityReputation}/100 · Tín dụng ${creditScore}`, 500, 156, 620);
-    ctx.fillText(`Giá bán ${(priceOptions[dailyPriceIndex] * 100).toFixed(0)}% · Món trọng tâm ${GAME_CONFIG.RECIPES[dailyRecipeIndex].name}`, 500, 183, 610);
-    ctx.fillText(`Khách quen hôm nay: ${dailyRegularOrders}/3 · Danh tiếng cao sẽ kéo thêm khách.`, 500, 211, 610);
+    ctx.fillText(`Uy tín quán ${customerReputation}/100 · Danh tiếng thành phố ${cityReputation}/100 · Tín dụng ${creditScore}`, 500, 148, 620);
+    ctx.fillText(`Giá bán ${(priceOptions[dailyPriceIndex] * 100).toFixed(0)}% · Món trọng tâm ${GAME_CONFIG.RECIPES[dailyRecipeIndex].name}`, 500, 175, 610);
+    ctx.fillText(`Khách quen hôm nay: ${dailyRegularOrders}/3 · Danh tiếng cao sẽ kéo thêm khách.`, 500, 203, 610);
     pOutlinedRect(ctx, 220, 226, 560, 40, "#fff3d6");
     ctx.fillText(`Giá bán: ${priceOptions.map((v,i)=>`${i===dailyPriceIndex?'●':'○'} ${Math.round(v*100)}%`).join('   ')}`, 500, 251);
     pOutlinedRect(ctx, 220, 274, 560, 40, "#fff3d6");
@@ -1998,14 +2072,27 @@ function drawManagementModal() {
         pOutlinedRect(ctx,220,y,560,38,owned?'#b6d6a0':'#fff3d6');
         ctx.fillText(`${upgrade.name} · ${owned?'Đã mua':moneyLabel(upgrade.price)} · ${upgrade.benefit}`,500,y+24,540);
     });
-    pOutlinedRect(ctx, 420, 500, 160, 36, "#f0b643");
-    ctx.fillText("Đóng [Q]", 500, 524);
+    const staffDesc = business?.type?.id === 'cafe' ? 'Tự bán +240k/ngày (lương 120k)' : 'Tăng +20% lãi ngày (lương 120k)';
+    pOutlinedRect(ctx, 220, 462, 560, 40, hasStaff ? '#b6d6a0' : '#fff3d6');
+    ctx.fillText(`👨‍🍳 Nhân viên đứng quầy: ${hasStaff ? 'Đang thuê (Bấm để nghỉ)' : 'Chưa thuê (Bấm để thuê)'} · ${staffDesc}`, 500, 487, 540);
+    pOutlinedRect(ctx, 420, 518, 160, 36, "#f0b643");
+    ctx.fillText("Đóng [Q]", 500, 542);
 }
 
 function handleManagementClick(x,y) {
-    if (x>=420&&x<=580&&y>=500&&y<=536){closeAllModals();return;}
+    if (x>=420&&x<=580&&y>=518&&y<=554){closeAllModals();return;}
     if (x>=220&&x<=780&&y>=226&&y<=266){dailyPriceIndex=(dailyPriceIndex+1)%priceOptions.length;return;}
     if (x>=220&&x<=780&&y>=274&&y<=314){dailyRecipeIndex=(dailyRecipeIndex+1)%GAME_CONFIG.RECIPES.length;return;}
+    if (x>=220&&x<=780&&y>=462&&y<=502){
+        const business=currentBusiness();
+        if(!business)return;
+        business.hasStaff=!business.hasStaff;
+        GameAudio?.playClick();
+        showToast(business.hasStaff
+            ? "👨‍🍳 Đã thuê nhân viên đứng quầy (trừ 120.000đ/ngày từ doanh thu)."
+            : "👨‍🍳 Đã cho nhân viên nghỉ việc.");
+        return;
+    }
     if (y>=326&&y<461){
         const upgrade=shopUpgrades[Math.floor((y-326)/45)]; const business=currentBusiness();
         if(!business||!upgrade)return;
@@ -2062,49 +2149,560 @@ function updateShopInterior() {
         return;
     }
     if (indoorShop.rental) updateShopCustomers();
-    updatePlayerMovement(238, 762, 265, 538);
+    const shopColliders = [
+        { x: 260, y: 314, w: 48, h: 77 },
+        { x: 690, y: 314, w: 48, h: 77 }
+    ];
+    if (indoorShop.market || indoorShop.name.includes("GẠO") || indoorShop.name.includes("CÁ") || indoorShop.name.includes("BÁNH")) {
+        shopColliders.push({ x: 232, y: 396, w: 62, h: 36 }, { x: 706, y: 396, w: 62, h: 36 });
+    }
+    const visitorsForCol = getShopVisitors(indoorShop);
+    visitorsForCol.forEach((_, index) => {
+        shopColliders.push({ x: getShopVisitorX(index, visitorsForCol.length) + 6, y: 419, w: 24, h: 18, dynamic: true });
+    });
+    updatePlayerMovement(238, 762, 265, 538, shopColliders);
     if (!isAnyModalOpen() && player.y >= 492 && player.x >= 440 && player.x <= 525 &&
         (keys.s || keys.ArrowDown)) leaveShop();
 }
 
 function drawShopInterior() {
     const shop = indoorShop;
-    const accent = shop.nightlife ? "#7f4eb0" : shop.food ? "#a65b40" : "#537765";
-    pRect(ctx, 0, 0, canvas.width, canvas.height, "#211921");
+    const isNight = Boolean(shop.nightlife);
+    const isTheater = shop.name.includes("NHÀ HÁT");
+    const isRooftop = shop.name.includes("BIA SÂN THƯỢNG");
+    const isShowroom = shop.name.includes("SHOWROOM");
+    const isRepair = shop.name.includes("SỬA XE");
+    const isFashion = shop.name.includes("SAIGON CHIC") || shop.name.includes("TIỆM MAY");
+    const isJewelryOrShoe = shop.name.includes("TRANG SỨC") || shop.name.includes("GIÀY");
+    const isBank = shop.name.includes("VIETBANK");
+    const isFlorist = shop.name.includes("HOA");
+    const isBookOrAntique = shop.name.includes("SÁCH") || shop.name.includes("ĐỒ CỔ");
+    const isBakeryOrTea = shop.name.includes("L'AMOUR") || shop.name.includes("L’AMOUR") || shop.name.includes("TRÀ") || shop.name.includes("CHÈ");
+    const isFoodOrRooftop = Boolean(shop.food || shop.name.includes("ĂN SÁNG") || shop.name.includes("CƠM") || isRooftop);
+    const isResidence = !shop.rental && !shop.menu && !shop.market && !shop.bikes && !isBank && !isTheater && !isNight && !isShowroom && !isRepair && !isFashion && !isJewelryOrShoe && !isBookOrAntique && !isBakeryOrTea && !isFoodOrRooftop && !isFlorist;
+    const accent = isNight ? "#7f4eb0" : isTheater ? "#8c1d4c" : isBank ? "#2e6b5e" : isRepair ? "#455a64" : isFoodOrRooftop ? "#a65b40" : "#537765";
+
+    // Nền tối xung quanh & khung tường phòng
+    pRect(ctx, 0, 0, canvas.width, canvas.height, "#1b141b");
+    pRect(ctx, 210, 98, 580, 447, "rgba(0,0,0,0.45)");
     pOutlinedRect(ctx, 216, 104, 568, 435, "#69524f");
-    pRect(ctx, 222, 189, 556, 344, shop.nightlife ? "#43334f" : "#d8bc98");
-    for (let y = 194; y < 532; y += 24) pRect(ctx, 222, y, 556, 1, "rgba(56,35,37,0.24)");
-    for (let x = 227; x < 777; x += 36) pRect(ctx, x, 189, 1, 344, "rgba(56,35,37,0.24)");
-    pOutlinedRect(ctx, 334, 198, 332, 72, accent);
-    for (let x = 350; x < 650; x += 34) pOutlinedRect(ctx, x, 205, 15, 16, "#e7ba7a");
-    pOutlinedRect(ctx, 431, 501, 138, 32, accent);
-    for (const x of [260, 690]) {
-        pOutlinedRect(ctx, x, 331, 48, 42, accent);
-        pOutlinedRect(ctx, x + 14, 314, 20, 13, "#b78765");
-        pOutlinedRect(ctx, x + 14, 378, 20, 13, "#b78765");
+
+    // Tường trên với phào chỉ gỗ & giấy dán tường theo chủ đề
+    const wallBg = isNight ? "#2a1e38" : isRooftop ? "#1a233a" : isTheater ? "#3d1624" : isBank ? "#dce6e0" : isShowroom ? "#dfe4ea" : isRepair ? "#cfd8dc" : isBakeryOrTea ? "#f5e9d9" : "#f2dfc1";
+    pRect(ctx, 222, 110, 556, 79, wallBg);
+    if (isRooftop) {
+        for (const [sx, sy] of [[260,124],[310,148],[395,120],[620,130],[690,122],[745,146]]) {
+            pRect(ctx, sx, sy, 3, 3, "#ffe082");
+        }
+        for (let i = 0; i < 12; i++) {
+            pRect(ctx, 236 + i * 46, 176, 6, 6, i % 2 ? "#ffd54f" : "#ff9800");
+        }
+    } else {
+        for (let wx = 230; wx < 770; wx += 28) {
+            pRect(ctx, wx, 110, 2, 79, (isNight || isTheater) ? "rgba(255,255,255,0.05)" : "rgba(120,85,55,0.08)");
+        }
     }
-    drawBitmapCharacter(player.x, player.y, playerConfig, player.dir, player.animFrame, player.isMoving, 1.5);
-    drawPlayerNameLabel(player.x, player.y);
-    drawMinimalHUD(shop.name);
+    pRect(ctx, 222, 182, 556, 7, isNight ? "#4f3669" : isTheater ? "#7a2339" : isRooftop ? "#4a5b7c" : "#8b5e3c");
+
+    // Hai cửa sổ (ẩn nếu là sân thượng mở hoặc nhà hát)
+    if (!isRooftop && !isTheater) {
+        for (const wx of [246, 706]) {
+            pOutlinedRect(ctx, wx, 122, 48, 46, isNight ? "#3c2752" : "#704a34");
+            pRect(ctx, wx + 4, 126, 40, 38, isNight ? "#673ab7" : "#a8d5e5");
+            pRect(ctx, wx + 22, 126, 3, 38, isNight ? "#3c2752" : "#704a34");
+            pRect(ctx, wx + 4, 143, 40, 3, isNight ? "#3c2752" : "#704a34");
+            if (!isNight) {
+                pRect(ctx, wx + 8, 130, 8, 10, "rgba(255,255,255,0.45)");
+            }
+        }
+    }
+
+    // Biển tên & Giờ mở cửa treo trang trọng trên tường
+    pOutlinedRect(ctx, 326, 115, 348, 60, isNight ? "#3d2654" : isTheater ? "#4a1220" : "#3a261d");
+    pOutlinedRect(ctx, 331, 120, 338, 50, isNight ? "#563278" : isTheater ? "#6b1b30" : "#5b3b2c");
     ctx.textAlign = "center";
-    ctx.font = "bold 20px 'Chakra Petch', sans-serif";
-    ctx.fillStyle = "#fff3d6";
-    ctx.fillText(shop.name, 500, 142, 500);
-    ctx.font = "bold 14px 'Chakra Petch', sans-serif";
-    ctx.fillText(shopHoursLabel(shop), 500, 168);
-    ctx.fillText(shop.market ? "Mua nguyên liệu" : shop.bikes ? "Thuê xe đạp" :
-        shop.rental ? (businesses[shop.rental.id]?.type.id !== "cafe" && businesses[shop.rental.id] ? "Xem lãi cửa hàng" : "Pha chế và bán cà phê") : shop.name.includes("TIỆM MAY") ? "Đặt may và thử đồ" : shop.menu ? "Xem món bán" : "Quầy tiếp khách", 500, 249);
-    ctx.fillText("Ra ngoài [Q]", 500, 522);
-    ctx.fillText("Đến quầy nhấn [E] hoặc bấm vào quầy", 500, 296);
-    if (shop.name.includes("SHOWROOM")) {
+    ctx.font = "bold 18px 'Chakra Petch', sans-serif";
+    ctx.fillStyle = "#ffe099";
+    ctx.fillText(shop.name, 500, 144, 320);
+    ctx.font = "bold 12px 'Chakra Petch', sans-serif";
+    ctx.fillStyle = "#e6d2b5";
+    ctx.fillText(isResidence ? "🏡 Không gian sinh hoạt" : "🕒 Giờ mở cửa: " + shopHoursLabel(shop), 500, 163);
+
+    // Sàn nhà theo từng nhóm cửa hàng
+    const floorBg = isNight ? "#2c2238" : isTheater ? "#4b1f29" : isRooftop ? "#4a4e5c" : isShowroom ? "#d5dde5" : isRepair ? "#a6aeb3" : isBank ? "#dce7e2" : isBakeryOrTea ? "#d2b48c" : "#d8bc98";
+    pRect(ctx, 222, 189, 556, 344, floorBg);
+    for (let y = 189; y < 532; y += 28) {
+        pRect(ctx, 222, y, 556, 1, (isNight || isTheater || isRooftop) ? "rgba(255,255,255,0.06)" : "rgba(56,35,37,0.16)");
+    }
+    for (let x = 222; x < 777; x += 36) {
+        pRect(ctx, x, 189, 1, 344, (isNight || isTheater || isRooftop) ? "rgba(255,255,255,0.06)" : "rgba(56,35,37,0.16)");
+    }
+
+    // Sàn giữa đặc trưng từng nhóm (không dùng chung 1 cái thảm cam cho tất cả nữa)
+    if (isNight) {
+        const beatFloor = Math.floor(performance.now() / 220);
+        const floorCols = ["rgba(255,46,147,0.22)", "rgba(0,229,255,0.20)", "rgba(184,77,255,0.22)", "rgba(255,230,0,0.18)"];
+        for (let ry = 304; ry < 448; ry += 28) {
+            for (let rx = 342; rx < 658; rx += 36) {
+                const tileIdx = (Math.floor(rx / 36) + Math.floor(ry / 28) + beatFloor) % floorCols.length;
+                pRect(ctx, rx + 2, ry + 2, 32, 24, floorCols[tileIdx]);
+            }
+        }
+        pOutlinedRect(ctx, 336, 300, 328, 152, "rgba(184,77,255,0.25)");
+        pOutlinedRect(ctx, 448, 480, 104, 18, "#4a2768");
+    } else if (isTheater) {
+        // Thảm đỏ dẫn lối lên sân khấu + 3 hàng ghế nhung đỏ xếp bậc
+        pRect(ctx, 472, 286, 56, 198, "#9c2238");
+        for (const rowY of [314, 356, 398]) {
+            for (let sx = 282; sx <= 682; sx += 38) {
+                if (sx >= 452 && sx <= 516) continue;
+                pOutlinedRect(ctx, sx, rowY, 28, 22, "#a3223a");
+                pRect(ctx, sx + 4, rowY + 4, 20, 8, "#d44b64");
+            }
+        }
+        pOutlinedRect(ctx, 448, 480, 104, 18, "#7a1d30");
+    } else if (isShowroom) {
+        // Vạch phản quang sàn đá Showroom
+        pOutlinedRect(ctx, 290, 305, 420, 145, "rgba(255,255,255,0.22)");
+        pOutlinedRect(ctx, 448, 480, 104, 18, "#546e7a");
+    } else if (isRepair) {
+        // Sàn xi măng gara + vết dầu mờ & thảm cao su
+        pRect(ctx, 380, 360, 48, 18, "rgba(35,38,42,0.25)");
+        pRect(ctx, 560, 390, 62, 22, "rgba(35,38,42,0.22)");
+        pOutlinedRect(ctx, 448, 480, 104, 18, "#455a64");
+    } else if (isBank) {
+        // Sàn đá cẩm thạch xanh-trắng + hàng ghế chờ ngân hàng
+        pOutlinedRect(ctx, 340, 316, 320, 128, "#b7d4c8");
+        for (let gx = 365; gx <= 610; gx += 75) {
+            pOutlinedRect(ctx, gx, 405, 56, 16, "#2e6b5e");
+        }
+        pOutlinedRect(ctx, 448, 480, 104, 18, "#2e6b5e");
+    } else if (isFoodOrRooftop) {
+        // Quán ăn / Đồ nướng / Lẩu / Bia sân thượng: sàn sạch, đặt bàn ăn ở giữa (không vẽ thảm)
+        pOutlinedRect(ctx, 448, 480, 104, 18, isRooftop ? "#37474f" : "#8b5e3c");
+    } else {
+        for (let ry = 290; ry < 470; ry += 28) {
+            for (let rx = 330; rx < 660; rx += 36) {
+                if (((rx + ry) / 2) % 2 === 0) {
+                    pRect(ctx, rx + 2, ry + 2, 32, 24, "rgba(166, 91, 64, 0.10)");
+                }
+            }
+        }
+        pOutlinedRect(ctx, 356, 316, 288, 128, isResidence ? "#7c583c" : isBakeryOrTea ? "#8d6e63" : "#b85d45");
+        pOutlinedRect(ctx, 366, 324, 268, 112, isResidence ? "#b88d65" : isBakeryOrTea ? "#c9a67d" : "#d9885b");
+        pOutlinedRect(ctx, 448, 480, 104, 18, "#8b5e3c");
+    }
+
+    // Hai chậu cây xanh trang trí góc trên
+    drawTerracottaPlant(ctx, 244, 214, 1.15);
+    drawTerracottaPlant(ctx, 756, 214, 1.15);
+
+    // Kệ hàng / Tủ trưng bày hai bên theo loại cửa hàng
+    if (shop.market || shop.name.includes("GẠO") || shop.name.includes("CÁ") || shop.name.includes("BÁNH")) {
+        // Hai kệ gỗ trưng bày thực phẩm & trái cây hai bên tường
+        for (const [idx, sx] of [228, 698].entries()) {
+            pOutlinedRect(ctx, sx, 220, 74, 92, "#7c4d34");
+            pRect(ctx, sx + 4, 224, 66, 84, "#5d3724");
+            for (const py of [246, 274, 302]) pRect(ctx, sx + 4, py, 66, 4, "#b88658");
+            ctx.textAlign = "center";
+            ctx.font = "14px 'Chakra Petch', sans-serif";
+            const rows = idx === 0
+                ? [['🍊', '🍎', '🍌'], ['🥬', '🥕', '🍅'], ['🫘', '🥫', '🥖']]
+                : [['🍉', '🍍', '🥭'], ['🥖', '🥐', '🧀'], ['🥫', '🥛', '🥚']];
+            rows.forEach((icons, r) => {
+                icons.forEach((ic, c) => {
+                    ctx.fillText(ic, sx + 15 + c * 22, 243 + r * 28);
+                });
+            });
+        }
+        // Sọt trái cây & bao hàng đặt dưới sàn ngay trước kệ
+        pOutlinedRect(ctx, 232, 396, 62, 36, "#a67c52");
+        pRect(ctx, 236, 400, 54, 28, "#d4a76a");
+        ctx.font = "15px 'Chakra Petch', sans-serif";
+        ctx.fillText("🍊🍎", 252, 420);
+        ctx.fillText("🍌", 278, 420);
+
+        pOutlinedRect(ctx, 706, 396, 62, 36, "#a67c52");
+        pRect(ctx, 710, 400, 54, 28, "#e8d5b7");
+        ctx.fillText("🥖🫘", 726, 420);
+        ctx.fillText("🥬", 752, 420);
+    } else if (isFlorist) {
+        for (const sx of [228, 698]) {
+            pOutlinedRect(ctx, sx, 222, 74, 88, "#5d4037");
+            pRect(ctx, sx + 4, 226, 66, 80, "#4e342e");
+            for (const py of [252, 280]) pRect(ctx, sx + 4, py, 66, 4, "#8d6e63");
+            ctx.textAlign = "center";
+            ctx.font = "14px 'Chakra Petch', sans-serif";
+            [['🌹', '🌻', '🌷'], ['🌺', '🌸', '💐'], ['🪴', '🌼', '🌱']].forEach((icons, r) => {
+                icons.forEach((ic, c) => ctx.fillText(ic, sx + 15 + c * 22, 246 + r * 28));
+            });
+        }
+    } else if (isBookOrAntique) {
+        for (const sx of [228, 698]) {
+            pOutlinedRect(ctx, sx, 220, 74, 90, "#4e342e");
+            pRect(ctx, sx + 4, 224, 66, 82, "#3e2723");
+            for (const py of [250, 278]) pRect(ctx, sx + 4, py, 66, 4, "#8d6e63");
+            ctx.textAlign = "center";
+            ctx.font = "14px 'Chakra Petch', sans-serif";
+            const rows = shop.name.includes("ĐỒ CỔ")
+                ? [['🏺', '🕰️', '🪙'], ['🍵', '🪔', '📿'], ['🗿', '⚱️', '🖼️']]
+                : [['📚', '📖', '📕'], ['📗', '📘', '📙'], ['📓', '📜', '✒️']];
+            rows.forEach((icons, r) => {
+                icons.forEach((ic, c) => ctx.fillText(ic, sx + 15 + c * 22, 244 + r * 28));
+            });
+        }
+    } else if (shop.name.includes("SỬA XE")) {
+        for (const sx of [228, 698]) {
+            pOutlinedRect(ctx, sx, 222, 74, 86, "#455a64");
+            pRect(ctx, sx + 4, 226, 66, 78, "#37474f");
+            ctx.textAlign = "center";
+            ctx.font = "14px 'Chakra Petch', sans-serif";
+            [['🔧', '⚙️', '🧰'], ['🛞', '🔩', '🛢️'], ['🚲', '🛵', '🔑']].forEach((icons, r) => {
+                icons.forEach((ic, c) => ctx.fillText(ic, sx + 15 + c * 22, 246 + r * 27));
+            });
+        }
+    } else if (shop.name.includes("TRANG SỨC")) {
+        for (const sx of [228, 698]) {
+            pOutlinedRect(ctx, sx, 222, 74, 86, "#7b1fa2");
+            pRect(ctx, sx + 4, 226, 66, 78, "#f3e5f5");
+            ctx.textAlign = "center";
+            ctx.font = "14px 'Chakra Petch', sans-serif";
+            [['💍', '💎', '👑'], ['📿', '⌚', '✨'], ['💍', '🔮', '💎']].forEach((icons, r) => {
+                icons.forEach((ic, c) => ctx.fillText(ic, sx + 15 + c * 22, 246 + r * 27));
+            });
+        }
+    } else if (shop.name.includes("GIÀY")) {
+        for (const sx of [228, 698]) {
+            pOutlinedRect(ctx, sx, 222, 74, 86, "#6d4c41");
+            pRect(ctx, sx + 4, 226, 66, 78, "#efebe9");
+            ctx.textAlign = "center";
+            ctx.font = "14px 'Chakra Petch', sans-serif";
+            [['👟', '👠', '👞'], ['🥾', '🥿', '👡'], ['👟', '🧦', '👞']].forEach((icons, r) => {
+                icons.forEach((ic, c) => ctx.fillText(ic, sx + 15 + c * 22, 246 + r * 27));
+            });
+        }
+    } else if (isFashion) {
+        const isTailor = shop.name.includes("TIỆM MAY");
+        for (const [idx, sx] of [228, 698].entries()) {
+            pOutlinedRect(ctx, sx, 222, 74, 88, isTailor ? "#6d4c41" : "#6a3d66");
+            pRect(ctx, sx + 4, 226, 66, 80, isTailor ? "#f5e6d3" : "#fceef5");
+            for (const py of [252, 280]) pRect(ctx, sx + 4, py, 66, 4, isTailor ? "#9c6b43" : "#c48fb8");
+            ctx.textAlign = "center";
+            ctx.font = "14px 'Chakra Petch', sans-serif";
+            const rows = isTailor
+                ? (idx === 0
+                    ? [['👔', '🧥', '👕'], ['🧵', '🪡', '✂️'], ['🧶', '📏', '🧣']]
+                    : [['👖', '🦺', '👔'], ['🧵', '🎨', '🪡'], ['🧣', '🧤', '🧥']])
+                : (idx === 0
+                    ? [['👗', '🧥', '👚'], ['👜', '👒', '👠'], ['✨', '🕶️', '🧣']]
+                    : [['🧥', '👗', '👘'], ['💎', '👜', '👠'], ['👒', '🧣', '✨']]);
+            rows.forEach((icons, r) => {
+                icons.forEach((ic, c) => ctx.fillText(ic, sx + 15 + c * 22, 246 + r * 28));
+            });
+        }
+        // Giá treo đồ & ma-nơ-canh / cuộn vải trưng bày hai bên dưới
+        if (isTailor) {
+            pOutlinedRect(ctx, 232, 396, 66, 36, "#7c4d34");
+            const boltColors = ["#526a91", "#64805c", "#b37c56", "#8c3f4a"];
+            boltColors.forEach((col, i) => {
+                pOutlinedRect(ctx, 237 + i * 14, 401, 11, 26, col);
+            });
+            pOutlinedRect(ctx, 702, 396, 66, 36, "#7c4d34");
+            pRect(ctx, 706, 400, 58, 28, "#f5e6d3");
+            ctx.font = "15px 'Chakra Petch', sans-serif";
+            ctx.fillText("👔🧥", 724, 420);
+            ctx.fillText("✂️", 750, 420);
+        } else {
+            for (const [mx, col] of [[244, "#7e57c2"], [712, "#d81b60"]]) {
+                pOutlinedRect(ctx, mx, 392, 46, 44, "#f8e8f2");
+                pRect(ctx, mx + 17, 398, 12, 10, "#e0b088");
+                pOutlinedRect(ctx, mx + 11, 408, 24, 22, col);
+            }
+        }
+    } else if (isShowroom) {
+        for (const sx of [228, 698]) {
+            pOutlinedRect(ctx, sx, 222, 74, 86, "#455a64");
+            pRect(ctx, sx + 4, 226, 66, 78, "#eceff1");
+            ctx.textAlign = "center";
+            ctx.font = "14px 'Chakra Petch', sans-serif";
+            [['🚲', '🛵', '🏍️'], ['🚗', '🚙', '🏎️'], ['🔑', '🛡️', '✨']].forEach((icons, r) => {
+                icons.forEach((ic, c) => ctx.fillText(ic, sx + 15 + c * 22, 246 + r * 27));
+            });
+        }
+    } else if (!isNight && (shop.food || shop.name.includes("ĂN SÁNG") || shop.name.includes("CƠM") || shop.name.includes("TRÀ") || shop.name.includes("CHÈ") || shop.rental)) {
+        for (const sx of [228, 698]) {
+            pOutlinedRect(ctx, sx, 222, 74, 86, "#7c4d34");
+            pRect(ctx, sx + 4, 226, 66, 78, "#fff3e0");
+            ctx.textAlign = "center";
+            ctx.font = "14px 'Chakra Petch', sans-serif";
+            const rows = shop.name.includes("TRÀ")
+                ? [['🍵', '🫖', '🌿'], ['🧋', '🍪', '🍯'], ['🎋', '🍵', '🕯️']]
+                : (shop.rental && (!businesses[shop.rental.id] || businesses[shop.rental.id]?.type.id === 'cafe'))
+                    ? [['☕', '🧋', '🥛'], ['🫘', '🍊', '🥐'], ['🍰', '🧁', '🧊']]
+                    : [['🍜', '🍲', '🍗'], ['🍤', '🍢', '🍚'], ['🥤', '🍵', '🥢']];
+            rows.forEach((icons, r) => {
+                icons.forEach((ic, c) => ctx.fillText(ic, sx + 15 + c * 22, 246 + r * 27));
+            });
+        }
+        if (shop.name.includes("NƯỚNG")) {
+            pOutlinedRect(ctx, 232, 396, 66, 36, "#4a231c");
+            pRect(ctx, 236, 400, 58, 28, "#8c2d19");
+            ctx.font = "15px 'Chakra Petch', sans-serif";
+            ctx.fillText("🔥🍢🔥", 265, 420);
+            pOutlinedRect(ctx, 702, 396, 66, 36, "#4a231c");
+            pRect(ctx, 706, 400, 58, 28, "#8c2d19");
+            ctx.fillText("🍖🔥🍗", 735, 420);
+        }
+    } else if (isBank) {
+        pOutlinedRect(ctx, 234, 222, 64, 72, "#2f4f4f");
+        pOutlinedRect(ctx, 246, 234, 40, 48, "#546e7a");
+        pOutlinedRect(ctx, 262, 252, 10, 10, "#ffd54f");
+        pOutlinedRect(ctx, 704, 222, 62, 62, "#1b4332");
+        ctx.fillStyle = "#a3e635";
+        ctx.font = "bold 10px 'Chakra Petch', sans-serif";
+        ctx.fillText("LÃI SUẤT", 735, 244);
+        ctx.fillText("VIETBANK", 735, 262);
+    }
+
+    // Hiệu ứng đèn xập xình bên trong Bar/Club & Quán Đồ Nướng
+    const isBBQ = shop.name.includes("NƯỚNG");
+    if (isNight || isBBQ) {
+        const beat = Math.floor(performance.now() / (isNight ? 180 : 260));
+        const partyPalette = isNight
+            ? ['#ff2e93', '#00e5ff', '#ffe600', '#b84dff']
+            : ['#ff5722', '#ff9800', '#ffd54f', '#ff3d00'];
+        ctx.save();
+        // Đèn dây nhấp nháy dọc trần phòng
+        for (let i = 0; i < 14; i++) {
+            const bx = 236 + i * 39;
+            const col = partyPalette[(i + beat) % partyPalette.length];
+            pRect(ctx, bx, 189, 8, 8, col);
+        }
+        // Luồng ánh sáng quét sàn
+        ctx.globalAlpha = isNight ? 0.16 : 0.11;
+        const c1 = partyPalette[beat % partyPalette.length];
+        const c2 = partyPalette[(beat + 2) % partyPalette.length];
+        const sway = Math.sin(performance.now() / 360) * 90;
+        ctx.fillStyle = c1;
+        ctx.beginPath();
+        ctx.moveTo(310, 189);
+        ctx.lineTo(390 + sway, 460);
+        ctx.lineTo(480 + sway, 460);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = c2;
+        ctx.beginPath();
+        ctx.moveTo(690, 189);
+        ctx.lineTo(520 - sway, 460);
+        ctx.lineTo(610 - sway, 460);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+
+    const visitors = getShopVisitors(shop);
+    const kyDuyenOnStage = isNight && shop.name.includes("SKYLINE")
+        ? visitors.find((npc) => npc.id === 'ky_duyen')
+        : null;
+    const floorVisitors = kyDuyenOnStage
+        ? visitors.filter((npc) => npc.id !== 'ky_duyen')
+        : visitors;
+
+    if (isNight) {
+        // 1. Sân khấu biểu diễn bên trái/giữa (x = 242..526, y = 194..276)
+        pRect(ctx, 246, 200, 284, 78, "rgba(0,0,0,0.35)");
+        pOutlinedRect(ctx, 242, 194, 284, 78, "#4a2168");
+        pRect(ctx, 248, 200, 272, 62, "#2f1545");
+        // Rèm nhung hai bên & đèn sân khấu
+        pOutlinedRect(ctx, 242, 194, 24, 68, "#8c1d4c");
+        pOutlinedRect(ctx, 502, 194, 24, 68, "#8c1d4c");
+        // Hai loa thùng hai góc sân khấu
+        pOutlinedRect(ctx, 270, 204, 24, 38, "#1b1b22");
+        pRect(ctx, 276, 210, 12, 12, "#455a64");
+        pRect(ctx, 276, 226, 12, 12, "#455a64");
+        pOutlinedRect(ctx, 474, 204, 24, 38, "#1b1b22");
+        pRect(ctx, 480, 210, 12, 12, "#455a64");
+        pRect(ctx, 480, 226, 12, 12, "#455a64");
+        // Bậc thang nhỏ lên sân khấu
+        pOutlinedRect(ctx, 356, 270, 56, 8, "#7b3fa0");
+
+        if (kyDuyenOnStage) {
+            // Vòng spotlight & Ca sĩ Kỳ Duyên hát Acoustic trên sân khấu
+            ctx.save();
+            ctx.globalAlpha = 0.22;
+            ctx.fillStyle = "#ffe082";
+            ctx.beginPath();
+            ctx.ellipse(384, 250, 40, 16, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+            pRect(ctx, 396, 228, 3, 28, "#b0bec5"); // Chân micro
+            pRect(ctx, 393, 226, 8, 5, "#cfd8dc");
+            drawBitmapCharacter(368, 206, {
+                genderIndex: kyDuyenOnStage.genderIndex,
+                look: kyDuyenOnStage.look,
+                outfitIndex: 0,
+                outfits: [{ color: kyDuyenOnStage.shirt, shadow: kyDuyenOnStage.shadow, shorts: kyDuyenOnStage.shorts }],
+                accessoryIndex: 0,
+                accessories: [{ type: kyDuyenOnStage.accessory }]
+            }, 'down', 0, false, 1.32);
+            const noteFloat = Math.sin(performance.now() / 260) * 4;
+            ctx.textAlign = "center";
+            ctx.font = "bold 12px 'Chakra Petch', sans-serif";
+            ctx.fillStyle = "#ffe099";
+            ctx.fillText("♪ ♫", 418, 218 + noteFloat);
+            ctx.fillText("🎤 Kỳ Duyên · Acoustic", 384, 290);
+        } else {
+            // Bàn DJ & đĩa xoay cho Neon Bar / Club Mưa Đêm
+            pOutlinedRect(ctx, 336, 218, 96, 34, "#1e272e");
+            pOutlinedRect(ctx, 348, 224, 22, 22, "#485460");
+            pOutlinedRect(ctx, 398, 224, 22, 22, "#485460");
+            pRect(ctx, 376, 226, 16, 16, "#00e5ff");
+            ctx.textAlign = "center";
+            ctx.font = "bold 12px 'Chakra Petch', sans-serif";
+            ctx.fillStyle = "#ffe099";
+            ctx.fillText("🎧 DJ & Sân Khấu", 384, 290);
+        }
+
+        // 2. Quầy Bar pha chế bên phải (x = 556..760, y = 198..270)
+        pRect(ctx, 560, 204, 204, 72, "rgba(0,0,0,0.28)");
+        pOutlinedRect(ctx, 556, 198, 204, 72, "#6a2e98");
+        pRect(ctx, 560, 202, 196, 14, "#b84dff");
+        pRect(ctx, 560, 218, 196, 4, "rgba(0,0,0,0.22)");
+        ctx.textAlign = "center";
+        ctx.font = "13px 'Chakra Petch', sans-serif";
+        ctx.fillText("🍸 🍹 🍾 🥃", 658, 214);
+        // 3 ghế bar cao phía trước quầy
+        for (const bx of [586, 650, 714]) {
+            pOutlinedRect(ctx, bx, 276, 20, 12, "#d81b60");
+        }
+        ctx.font = "bold 13px 'Chakra Petch', sans-serif";
+        ctx.fillStyle = "#fff6e5";
+        ctx.fillText("🍸 Quầy Bar [E]", 658, 250);
+        pOutlinedRect(ctx, 578, 292, 160, 20, "rgba(43, 29, 22, 0.78)");
+        ctx.font = "bold 11px 'Chakra Petch', sans-serif";
+        ctx.fillStyle = "#ffe099";
+        ctx.fillText("Gọi đồ: [E] hoặc Click", 658, 306);
+
+        // 3. Hai bàn tròn VIP & ghế sofa bọc nhung hai bên sàn nhảy
+        for (const x of [256, 694]) {
+            pOutlinedRect(ctx, x - 4, 320, 56, 14, "#7b1e4a"); // Sofa trên
+            pOutlinedRect(ctx, x - 4, 376, 56, 14, "#7b1e4a"); // Sofa dưới
+            pOutlinedRect(ctx, x + 6, 338, 36, 32, "#3c1d52"); // Bàn VIP
+            pRect(ctx, x + 12, 344, 24, 20, "#512b6e");
+            pRect(ctx, x + 21, 350, 6, 6, "#ffd54f"); // Nến bàn VIP
+        }
+    } else if (isTheater) {
+        // Sân khấu Nhà Hát lớn phía trên (giữ vùng click 334..666, 198..270)
+        pRect(ctx, 250, 198, 500, 74, "rgba(0,0,0,0.32)");
+        pOutlinedRect(ctx, 246, 192, 508, 74, "#7a1d30");
+        pRect(ctx, 254, 200, 492, 58, "#561826");
+        pOutlinedRect(ctx, 246, 192, 36, 74, "#a3223a");
+        pOutlinedRect(ctx, 718, 192, 36, 74, "#a3223a");
+        pRect(ctx, 498, 212, 4, 26, "#d7ccc8");
+        pRect(ctx, 494, 210, 12, 5, "#ffe082");
+        pOutlinedRect(ctx, 466, 264, 68, 8, "#c28748");
+    } else if (isResidence) {
+        // Phòng khách nhà dân / Văn phòng: không vẽ quầy thu ngân
+        if (shop.name.includes("VĂN PHÒNG")) {
+            pOutlinedRect(ctx, 356, 202, 288, 62, "#546e7a");
+            pRect(ctx, 364, 208, 272, 16, "#cfd8dc");
+            pOutlinedRect(ctx, 476, 200, 48, 28, "#263238");
+            pRect(ctx, 480, 204, 40, 20, "#80deea");
+        } else {
+            // Tủ gỗ gia đình, đồng hồ quả lắc & tranh phong cảnh
+            pOutlinedRect(ctx, 376, 196, 248, 64, "#6d4c41");
+            pRect(ctx, 384, 204, 232, 48, "#8d6e63");
+            pOutlinedRect(ctx, 464, 206, 72, 34, "#e8f5e9");
+            pRect(ctx, 472, 224, 56, 12, "#81c784");
+            pOutlinedRect(ctx, 316, 198, 34, 66, "#5d4037");
+            pRect(ctx, 325, 208, 16, 16, "#fff8e1");
+            // Bộ bàn ghế gỗ tiếp khách & ấm trà ở giữa phòng
+            pOutlinedRect(ctx, 434, 336, 132, 56, "#6d4c41");
+            pRect(ctx, 444, 344, 112, 40, "#a1887f");
+            pOutlinedRect(ctx, 488, 356, 24, 16, "#fff3e0");
+            for (const sx of [404, 574]) pOutlinedRect(ctx, sx, 348, 22, 34, "#5d4037");
+        }
+    } else {
+        // Quầy giao dịch / Quầy bếp trung tâm theo từng loại cửa hàng (vùng click 334..666, 198..270)
+        pRect(ctx, 338, 204, 332, 72, "rgba(0,0,0,0.22)");
+        pOutlinedRect(ctx, 334, 198, 332, 72, accent);
+        pRect(ctx, 338, 202, 324, 14, isFoodOrRooftop ? "#ffd8b8" : isBank ? "#e0f2f1" : "#fff1d6");
+        pRect(ctx, 338, 218, 324, 4, "rgba(0,0,0,0.18)");
+
+        if (isFoodOrRooftop) {
+            // Quầy bếp mở có khay đồ ăn / vỉ nướng rực lửa
+            ctx.textAlign = "center";
+            ctx.font = "14px 'Chakra Petch', sans-serif";
+            ctx.fillText(shop.name.includes("NƯỚNG") ? "🔥 🍢 🥩 🔥 🍗 🍤 🔥" : "🍲 🍜 🍗 🍤 🥢 🍺", 500, 215);
+            // 4 bàn ăn có món nóng hổi & đũa chén ở hai bên sảnh
+            for (const [bx, by] of [[256, 324], [256, 402], [696, 324], [696, 402]]) {
+                pOutlinedRect(ctx, bx, by, 52, 38, "#7c4d34");
+                pRect(ctx, bx + 5, by + 5, 42, 28, "#fff3e0");
+                ctx.font = "14px 'Chakra Petch', sans-serif";
+                ctx.fillText(isRooftop ? "🍺" : shop.name.includes("LẨU") ? "🍲" : shop.name.includes("NƯỚNG") ? "🍖" : "🍜", bx + 26, by + 24);
+                pOutlinedRect(ctx, bx + 16, by - 11, 20, 9, "#a67c52");
+                pOutlinedRect(ctx, bx + 16, by + 40, 20, 9, "#a67c52");
+            }
+        } else if (isBakeryOrTea) {
+            const isTea = shop.name.includes("TRÀ") || shop.name.includes("CHÈ");
+            ctx.textAlign = "center";
+            ctx.font = "14px 'Chakra Petch', sans-serif";
+            ctx.fillText(isTea ? "🍵 🫖 🌿 🧋 🍯" : "🥐 🍰 🧁 🥖 🍮", 500, 215);
+            for (const x of [258, 692]) {
+                pOutlinedRect(ctx, x, 334, 48, 38, "#6d4c41");
+                pRect(ctx, x + 6, 340, 36, 26, isTea ? "#d7ccc8" : "#fff8e7");
+                ctx.fillText(isTea ? "🫖" : "🥐", x + 24, 358);
+                pOutlinedRect(ctx, x + 12, 316, 24, 14, isTea ? "#558b2f" : "#c58b67");
+                pOutlinedRect(ctx, x + 12, 376, 24, 14, isTea ? "#558b2f" : "#c58b67");
+            }
+        } else {
+            pOutlinedRect(ctx, 352, 200, 26, 20, "#37474f");
+            pRect(ctx, 356, 203, 18, 8, "#80cbc4");
+            pOutlinedRect(ctx, 620, 200, 24, 20, "#6d4c41");
+            pRect(ctx, 624, 194, 16, 8, "#f0b643");
+            for (let x = 394; x < 606; x += 36) {
+                pOutlinedRect(ctx, x, 204, 16, 14, "#e7ba7a");
+            }
+            if (isBank) {
+                // 2 máy ATM phát sáng bên tường phải
+                for (const ax of [698, 738]) {
+                    pOutlinedRect(ctx, ax, 326, 30, 52, "#1b4332");
+                    pRect(ctx, ax + 5, 333, 20, 14, "#80cbc4");
+                    pRect(ctx, ax + 6, 354, 18, 4, "#a3e635");
+                }
+            } else if (isRepair) {
+                // Bàn nâng sửa xe máy & giá lốp xe
+                pOutlinedRect(ctx, 250, 334, 68, 46, "#37474f");
+                pRect(ctx, 256, 340, 56, 34, "#546e7a");
+                ctx.textAlign = "center";
+                ctx.font = "18px 'Chakra Petch', sans-serif";
+                ctx.fillText("🛵🔧", 284, 363);
+                pOutlinedRect(ctx, 688, 334, 58, 46, "#b71c1c");
+                ctx.fillText("🛞🧰", 717, 363);
+            } else if (!isShowroom) {
+                for (const x of [260, 690]) {
+                    pRect(ctx, x + 3, 335, 48, 42, "rgba(0,0,0,0.18)");
+                    pOutlinedRect(ctx, x, 331, 48, 42, accent);
+                    pRect(ctx, x + 6, 337, 36, 30, "#fff5e1");
+                    pRect(ctx, x + 18, 346, 12, 10, "#6f4e37");
+                    pOutlinedRect(ctx, x + 14, 314, 20, 13, "#b78765");
+                    pOutlinedRect(ctx, x + 14, 378, 20, 13, "#b78765");
+                }
+            }
+        }
+    }
+
+    // Nội thất đặc trưng cho Showroom / Thời trang / Đọc sách / Trang sức
+    if (isShowroom) {
         for (const [index, color] of ["#b64b52", "#598fb0", "#dfaf55"].entries()) {
             const x = 323 + index * 125;
+            pOutlinedRect(ctx, x - 6, 382, 111, 10, "#90a4ae");
             pOutlinedRect(ctx, x, 347, 99, 36, color);
             pOutlinedRect(ctx, x + 23, 335, 52, 16, "#759eaa");
             for (const offset of [12, 71]) pOutlinedRect(ctx, x + offset, 374, 16, 12, "#241d26");
         }
     }
-    if (shop.name.includes("SAIGON CHIC") || shop.name.includes("TIỆM MAY")) {
+    if (isFashion) {
         for (const [index, color] of ["#6b4f8c", "#f3d6a3", "#a96457"].entries()) {
             const x = 360 + index * 106;
             pRect(ctx, x + 18, 335, 3, 48, "#624c48");
@@ -2114,20 +2712,51 @@ function drawShopInterior() {
         pOutlinedRect(ctx, 698, 215, 42, 78, "#a7c3c5");
         pRect(ctx, 705, 224, 4, 48, "#e1efdc");
     }
-    const visitors = getShopVisitors(shop);
-    visitors.forEach((npc, index) => {
-        const x = 341 + index * 142;
+    if (isBookOrAntique) {
+        for (const bx of [376, 566]) {
+            pOutlinedRect(ctx, bx, 326, 58, 26, "#5d4037");
+            ctx.textAlign = "center";
+            ctx.font = "14px 'Chakra Petch', sans-serif";
+            ctx.fillText(shop.name.includes("ĐỒ CỔ") ? "🏺🕰️" : "📚📖", bx + 29, 344);
+        }
+    }
+
+    // Khách / NPC đang có mặt trong quán
+    floorVisitors.forEach((npc, index) => {
+        const x = getShopVisitorX(index, floorVisitors.length);
         drawBitmapCharacter(x, 401, { genderIndex: npc.genderIndex, look: npc.look, outfitIndex: 0,
             outfits: [{ color: npc.shirt, shadow: npc.shadow, shorts: npc.shorts }],
             accessoryIndex: 0, accessories: [{ type: npc.accessory }] }, 'down', 0, false, 1.4);
+        ctx.textAlign = "center";
         ctx.fillStyle = "#fff3d6";
-        ctx.fillText(npc.name, x + 16, 398, 135);
+        ctx.font = "bold 12px 'Chakra Petch', sans-serif";
+        ctx.fillText(npc.name, x + 16, 398, 115);
     });
-    if (shop.name.includes("SKYLINE") && visitors.some((npc) => npc.id === 'ky_duyen')) {
-        pOutlinedRect(ctx, 381, 313, 238, 64, "#6f426e");
-        ctx.fillStyle = "#fff3d6";
-        ctx.fillText("♪ Kỳ Duyên · Acoustic", 500, 352);
+
+    // Nhân vật của người chơi
+    drawBitmapCharacter(player.x, player.y, playerConfig, player.dir, player.animFrame, player.isMoving, 1.5);
+    drawPlayerNameLabel(player.x, player.y);
+
+    // Chữ hướng dẫn trên quầy & nút Ra ngoài [Q] (giữ nguyên vùng click 431..569, 501..533)
+    if (!isNight && !isResidence) {
+        ctx.textAlign = "center";
+        ctx.font = "bold 14px 'Chakra Petch', sans-serif";
+        ctx.fillStyle = "#fff6e5";
+        ctx.fillText(isTheater ? "🎭 Sân khấu Nhà Hát" : shop.market ? "🛒 Mua nguyên liệu" : shop.bikes ? "🚲 Thuê xe đạp" :
+            shop.rental ? (businesses[shop.rental.id]?.type.id !== "cafe" && businesses[shop.rental.id] ? "📊 Xem lãi cửa hàng" : "☕ Pha chế và bán cà phê") : shop.name.includes("TIỆM MAY") ? "🧵 Đặt may và thử đồ" : shop.menu ? "🛍️ Xem món bán" : "✨ Quầy tiếp khách", 500, 249);
+
+        pOutlinedRect(ctx, 412, 276, 176, 22, "rgba(43, 29, 22, 0.72)");
+        ctx.font = "bold 11.5px 'Chakra Petch', sans-serif";
+        ctx.fillStyle = "#ffe099";
+        ctx.fillText(isTheater ? "Sân khấu biểu diễn" : "Đến quầy nhấn [E] hoặc Click", 500, 291);
     }
+
+    pOutlinedRect(ctx, 431, 501, 138, 32, accent);
+    ctx.font = "bold 13px 'Chakra Petch', sans-serif";
+    ctx.fillStyle = "#fff6e5";
+    ctx.fillText("🚪 Ra ngoài [Q]", 500, 522);
+
+    drawMinimalHUD(shop.name);
     if (showShopMenu) drawShopMenu();
     if(showManagementModal) drawManagementModal();
     if(showBankModal) drawBankModal();
@@ -2178,16 +2807,18 @@ function drawFreestandingBuilding(c, zid, x, y, w, h, opts = {}) {
         drawShutteredWindow(c, x + w - 66, y + 20, 44, 34);
     }
 
-    // Mái hiên & Bảng hiệu
-    drawStripedAwning(c, x + 4, y + 66, w - 8, 22, awning1, awning2);
+    // Mái hiên & Bảng hiệu (đặt gọn phía trên, chừa khoảng trống cho cửa cuốn)
+    drawStripedAwning(c, x + 4, y + 60, w - 8, 20, awning1, awning2);
     if (title) {
-        drawRentalStorefrontSign(c, x + 14, y + 52, w - 28, title, subTitle, signBg, signBorder);
+        drawRentalStorefrontSign(c, x + 14, y + 46, w - 28, title, subTitle, signBg, signBorder);
     }
 
-    // Cửa chính
+    // Cửa chính (giới hạn chiều cao để không bao giờ che mất bảng hiệu)
     const gateW = Math.min(140, w - 56);
-    pRect(c, x + (w - gateW) / 2 - 7, y + h - 72, gateW + 14, 5, wallLight);
-    drawFoldingGate(c, x + (w - gateW) / 2, y + h - 68, gateW, 68, gateCol, PAL.SHUTTER_DARK);
+    const gateH = Math.min(54, Math.max(40, h - 102));
+    const gateY = y + h - gateH;
+    pRect(c, x + (w - gateW) / 2 - 7, gateY - 4, gateW + 14, 5, wallLight);
+    drawFoldingGate(c, x + (w - gateW) / 2, gateY, gateW, gateH, gateCol, PAL.SHUTTER_DARK);
     if (zid && !title.includes('NHÀ CỦA TÔI')) registerShop(zid, title, x, y, w, h, gateW);
 
     // Chậu cây cảnh hai bên cửa
@@ -2744,12 +3375,12 @@ function drawVilla(c, x, y, width, name, color) {
     for (const offset of [27, width / 2 - 20, width - 67]) {
         drawShutteredWindow(c, x + offset, y + 29, 40, 43);
     }
-    pOutlinedRect(c, x + 20, y + 78, width - 40, 12, "#705a54");
-    for (let rail = x + 26; rail < x + width - 20; rail += 11) pRect(c, rail, y + 82, 2, 7, "#d3baa0");
-    drawFoldingGate(c, x + width / 2 - 31, y + 106, 62, 61, "#52695e", "#333f37");
+    pOutlinedRect(c, x + 20, y + 72, width - 40, 12, "#705a54");
+    for (let rail = x + 26; rail < x + width - 20; rail += 11) pRect(c, rail, y + 76, 2, 7, "#d3baa0");
+    drawFoldingGate(c, x + width / 2 - 31, y + 124, 62, 42, "#52695e", "#333f37");
     drawTerracottaPlant(c, x + 23, y + 145, 1.45);
     drawTerracottaPlant(c, x + width - 42, y + 145, 1.45);
-    drawRentalStorefrontSign(c, x + 15, y + 96, width - 30, name, "", "#634846", "#e4bd83");
+    drawRentalStorefrontSign(c, x + 15, y + 76, width - 30, name, "", "#634846", "#e4bd83");
     addCollider('VILLAS', x, y, width, height);
 }
 
@@ -2770,6 +3401,32 @@ for (const zid of ['VILLAS', 'CANAL_MARKET']) {
         });
         drawVilla(c, 345, 825, 282, "BIỆT THỰ VƯỜN MÂY", "#dcd3b7");
         drawVilla(c, 1395, 825, 282, "BIỆT THỰ TRÚC", "#d3d9bb");
+
+        // Xe hơi & xe máy sang trọng đậu dọc đường Khu Biệt Thự
+        const drawParkedCar = (px, py, bodyCol, roofCol) => {
+            pRect(c, px + 4, py + 28, 84, 10, "rgba(0,0,0,0.28)");
+            pOutlinedRect(c, px, py + 8, 92, 24, bodyCol);
+            pOutlinedRect(c, px + 18, py, 52, 14, roofCol);
+            pRect(c, px + 24, py + 3, 18, 8, "#b3e5fc");
+            pRect(c, px + 46, py + 3, 18, 8, "#b3e5fc");
+            pOutlinedRect(c, px + 12, py + 26, 16, 10, "#212121");
+            pOutlinedRect(c, px + 64, py + 26, 16, 10, "#212121");
+            addCollider(zid, px, py + 4, 92, 30);
+        };
+        const drawParkedBike = (px, py, bodyCol) => {
+            pRect(c, px + 2, py + 18, 34, 6, "rgba(0,0,0,0.24)");
+            pOutlinedRect(c, px + 6, py + 4, 24, 12, bodyCol);
+            pOutlinedRect(c, px + 2, py + 12, 10, 8, "#212121");
+            pOutlinedRect(c, px + 24, py + 12, 10, 8, "#212121");
+            pRect(c, px + 22, py, 4, 6, "#cfd8dc");
+            addCollider(zid, px + 2, py + 4, 32, 16);
+        };
+        drawParkedCar(250, 480, "#37474f", "#cfd8dc");
+        drawParkedCar(1120, 480, "#8e2430", "#f5f5f5");
+        drawParkedCar(1540, 695, "#1565c0", "#e3f2fd");
+        drawParkedBike(560, 492, "#659ba5");
+        drawParkedBike(920, 492, "#d84315");
+        drawParkedBike(740, 704, "#fbc02d");
     } else {
         pRect(c, 0, 1080, WORLD_W, 320, "#43889c");
         pRect(c, 0, 1050, WORLD_W, 30, "#a99078");
@@ -2794,9 +3451,9 @@ const additionalBuildings = {
     DOWNTOWN: [[1640, 860, "NHÀ SÁCH", "#a4b2bd"], [255, 840, "TIỆM MAY", "#d3ae83"], [465, 840, "TIỆM GIÀY", "#c9bca4"], [680, 840, "TIỆM TRANG SỨC", "#d4b8c3"]],
     OFFICE_DISTRICT: [[1665, 845, "VĂN PHÒNG", "#b2bec8"], [1630, 240, "CƠM TRƯA", "#d7b68f"]],
     DISTRICT_1: [
-        [1135, 230, "NEON BAR", "#533a65"], [1360, 230, "CLUB MƯA ĐÊM", "#4b405e"],
+        [1135, 215, "NEON MƯA ĐÊM CLUB", "#503568", 340, 155],
         [1600, 230, "QUÁN NƯỚNG", "#79534f"], [242, 840, "NHÀ HÁT", "#855568"],
-        [455, 840, "ỐC ĐÊM", "#735161"], [670, 840, "LẨU BỜ KÈ", "#66515d"],
+        [455, 830, "ỐC & LẨU ĐÊM BỜ KÈ", "#6c4e5f", 340, 150],
         [1645, 850, "BIA SÂN THƯỢNG", "#60495f"]
     ],
     ELDERLY_AREA: [
@@ -2817,9 +3474,23 @@ const additionalBuildings = {
 };
 for (const [zone, buildings] of Object.entries(additionalBuildings)) {
     const c = zoneCanvases[zone].getContext('2d');
-    for (const [x, y, title, wallCol] of buildings) {
+    for (const [x, y, title, wallCol, customW, customH] of buildings) {
         const sign = zone === 'DISTRICT_1' ? { signBg: '#542a6b', signBorder: '#6addcf' } : {};
-        drawFreestandingBuilding(c, zone, x, y, 160, 140, { title, wallCol, ...sign });
+        drawFreestandingBuilding(c, zone, x, y, customW || 160, customH || 140, { title, wallCol, ...sign });
+    }
+}
+// Bàn ghế ăn ngoài trời xung quanh & phía trước Quán Nướng (Quận 1)
+{
+    const d1 = zoneCanvases.DISTRICT_1.getContext('2d');
+    const bbqTables = [[1524, 315], [1545, 405], [1730, 405], [1786, 315]];
+    for (const [tx, ty] of bbqTables) {
+        pOutlinedRect(d1, tx, ty, 44, 30, "#6d4c41");
+        pRect(d1, tx + 4, ty + 4, 36, 22, "#f5e1c8");
+        pOutlinedRect(d1, tx + 15, ty + 9, 14, 12, "#d84315");
+        pRect(d1, tx + 18, ty + 12, 8, 6, "#ffab40");
+        pOutlinedRect(d1, tx + 14, ty - 10, 16, 8, "#8d6e63");
+        pOutlinedRect(d1, tx + 14, ty + 32, 16, 8, "#8d6e63");
+        addCollider('DISTRICT_1', tx, ty, 44, 30);
     }
 }
 const officeCanvas = zoneCanvases.OFFICE_DISTRICT.getContext('2d');
@@ -2894,7 +3565,11 @@ function confirmStartNextDay() {
         coffeeCart.x = 1110;
         coffeeCart.y = 382;
     }
+    coffeeCart.isOpen = true;
     cartServiced = false;
+    deliveryOffers = [];
+    activeDeliveryOrder = null;
+    deliveryCompletedToday = 0;
     playerStats.day += 1;
     playerStats.dayOfYear += 1;
     if (playerStats.dayOfYear > GAME_CONFIG.TIME.DAYS_PER_YEAR) {
@@ -3255,6 +3930,11 @@ function triggerInteractable(inter) {
         closeAllModals();
         showMarketModal = true;
     } else if (inter.type === 'BREW_SPOT') {
+        if (inter.data?.spotId === 'cart_mobile' && !coffeeCart.isOpen) {
+            GameAudio?.playError();
+            showToast("🔒 Xe Cà Phê đang đóng cửa! Nhấn [C] để mở bán lại.");
+            return;
+        }
         closeAllModals();
         activeBrewSpot = inter.data;
         showBrewModal = true;
@@ -3455,11 +4135,15 @@ function settleBusinesses() {
             addCityReputation(2);
             recordChapterAction('rental');
             news.push(`Đã mở ${business.type.name} cùng ${partner.npc.name}.`);
-        } else if (playerStats.day >= business.opensDay && business.type.daily) {
+        } else if (playerStats.day >= business.opensDay && (business.type.daily || business.hasStaff)) {
             const share = business.partner?.share || 0;
             const zone = GAME_CONFIG.ZONES[business.zone];
             const spouseBonus = spouse ? 1.1 : 1;
-            income += Math.round(business.type.daily * zone.priceMultiplier * (1 - share) * spouseBonus / 1000) * 1000;
+            const baseDaily = business.type.daily || (business.hasStaff ? 240000 : 0);
+            const staffMult = business.hasStaff && business.type.daily ? 1.2 : 1;
+            const staffSalary = business.hasStaff ? 120000 : 0;
+            const net = Math.round(baseDaily * zone.priceMultiplier * (1 - share) * spouseBonus * staffMult / 1000) * 1000 - staffSalary;
+            income += Math.max(0, net);
         }
     }
     playerStats.money += income;
@@ -3478,6 +4162,228 @@ let dailyRegularOrders = 0;
 let regularContractPaid = false;
 let creditScore = 0;
 let bankDebt = 0;
+
+let showDeliveryModal = false;
+let deliveryOffers = [];
+let activeDeliveryOrder = null;
+let deliveryCompletedToday = 0;
+
+function hasDeliveryVehicle() {
+    return ownedVehicles.size > 0;
+}
+
+const DELIVERY_CUSTOMERS = ['Anh Minh', 'Chị Lan', 'Bạn Khoa', 'Cô Thảo', 'Anh Tuấn', 'Bé Vy', 'Chú Hùng'];
+
+function getDeliveryTargetZones() {
+    const keys = Object.keys(GAME_CONFIG.ZONES);
+    const others = keys.filter((k) => k !== currentZone);
+    return others.length ? others : keys;
+}
+
+function generateDeliveryOffers() {
+    const targetZones = getDeliveryTargetZones();
+    const curHour = Math.floor(playerStats.hour || 5);
+    const offers = [];
+    for (let i = 0; i < 3; i++) {
+        const recipe = GAME_CONFIG.RECIPES[Math.floor(Math.random() * GAME_CONFIG.RECIPES.length)];
+        const zoneKey = targetZones[Math.floor(Math.random() * targetZones.length)];
+        const zone = GAME_CONFIG.ZONES[zoneKey];
+        const cups = 2 + Math.floor(Math.random() * 3);
+        const shipBonus = 18000 + Math.floor(Math.random() * 15000);
+        const reward = Math.round((recipe.sellPrice * cups * (zone?.priceMultiplier || 1) + shipBonus) / 1000) * 1000;
+        const deadlineHour = Math.min(23, curHour + 3 + (i % 2));
+        const customerName = DELIVERY_CUSTOMERS[Math.floor(Math.random() * DELIVERY_CUSTOMERS.length)];
+        offers.push({
+            id: `${playerStats.day}_${curHour}_${i}_${Math.floor(Math.random() * 999)}`,
+            recipeIndex: GAME_CONFIG.RECIPES.indexOf(recipe),
+            recipeName: recipe.name,
+            coffeeNeed: recipe.coffee * cups,
+            milkNeed: (recipe.milk || 0) * cups,
+            fruitNeed: (recipe.fruit || 0) * cups,
+            cups,
+            zoneKey,
+            zoneName: zone ? zone.name : zoneKey,
+            reward,
+            deadlineHour,
+            customerName
+        });
+    }
+    deliveryOffers = offers;
+}
+
+function canFulfillDelivery(order) {
+    if (!order) return false;
+    return inventory.coffee >= order.coffeeNeed &&
+        inventory.milk >= order.milkNeed &&
+        inventory.fruit >= order.fruitNeed;
+}
+
+function acceptDeliveryOffer(index) {
+    if (activeDeliveryOrder) {
+        GameAudio?.playError();
+        showToast("🛵 Bạn đang có 1 đơn cần giao rồi!");
+        return;
+    }
+    const offer = deliveryOffers[index];
+    if (!offer) return;
+    activeDeliveryOrder = { ...offer };
+    deliveryOffers.splice(index, 1);
+    showDeliveryModal = false;
+    GameAudio?.playClick();
+    showToast(`🛵 Nhận đơn: ${offer.cups} ${offer.recipeName} -> ${offer.zoneName} (trước ${offer.deadlineHour}:00)`);
+}
+
+function deliverActiveOrder() {
+    if (!activeDeliveryOrder) return;
+    if (currentZone !== activeDeliveryOrder.zoneKey) {
+        GameAudio?.playError();
+        showToast(`📍 Cần đến ${activeDeliveryOrder.zoneName} để giao đơn này!`);
+        return;
+    }
+    if (!canFulfillDelivery(activeDeliveryOrder)) {
+        GameAudio?.playError();
+        showToast(`⚠️ Thiếu nguyên liệu để pha ${activeDeliveryOrder.cups} ${activeDeliveryOrder.recipeName}!`);
+        return;
+    }
+    inventory.coffee -= activeDeliveryOrder.coffeeNeed;
+    inventory.milk -= activeDeliveryOrder.milkNeed;
+    inventory.fruit -= activeDeliveryOrder.fruitNeed;
+    playerStats.money += activeDeliveryOrder.reward;
+    dailyReport.cupsSold += activeDeliveryOrder.cups;
+    dailyReport.revenue += activeDeliveryOrder.reward;
+    deliveryCompletedToday += 1;
+    addCityReputation(2);
+    GameAudio?.playCoin();
+    const doneZone = activeDeliveryOrder.zoneName;
+    const doneReward = activeDeliveryOrder.reward;
+    activeDeliveryOrder = null;
+    if (!deliveryOffers.length) generateDeliveryOffers();
+    showDeliveryModal = false;
+    showToast(`✅ Đã giao đơn tại ${doneZone}! +${moneyLabel(doneReward)} (+2 Danh tiếng)`);
+}
+
+function checkDeliveryExpiration() {
+    if (!activeDeliveryOrder) return;
+    if (playerStats.hour >= activeDeliveryOrder.deadlineHour) {
+        const failedZone = activeDeliveryOrder.zoneName;
+        activeDeliveryOrder = null;
+        GameAudio?.playError();
+        showToast(`⏰ Quá giờ giao đơn đến ${failedZone}! Đơn ship đã bị hủy.`);
+    }
+}
+
+function drawDeliveryModal() {
+    pRect(ctx, 0, 0, canvas.width, canvas.height, "rgba(20,14,10,0.82)");
+    pOutlinedRect(ctx, 170, 84, 660, 472, "#ecd3ab");
+    ctx.textAlign = "center";
+    ctx.fillStyle = PAL.OUTLINE;
+    ctx.font = "bold 20px 'Chakra Petch', sans-serif";
+    ctx.fillText("🛵 Nhận Đơn Giao Hàng Liên Khu [F]", 500, 120);
+    const curZoneName = GAME_CONFIG.ZONES[currentZone]?.name || currentZone;
+    ctx.font = "bold 13px 'Chakra Petch', sans-serif";
+    ctx.fillText(`Vị trí hiện tại: ${curZoneName} · Đã giao hôm nay: ${deliveryCompletedToday} đơn`, 500, 146, 620);
+
+    if (activeDeliveryOrder) {
+        const o = activeDeliveryOrder;
+        const inTarget = currentZone === o.zoneKey;
+        const hasIng = canFulfillDelivery(o);
+        pOutlinedRect(ctx, 210, 170, 580, 190, inTarget && hasIng ? "#d6e8c3" : "#fff3d6");
+        ctx.fillStyle = PAL.OUTLINE;
+        ctx.font = "bold 16px 'Chakra Petch', sans-serif";
+        ctx.fillText(`ĐƠN ĐANG NHẬN · Khách: ${o.customerName}`, 500, 202);
+        ctx.font = "bold 15px 'Chakra Petch', sans-serif";
+        ctx.fillText(`${o.cups}x ${o.recipeName}  →  ${o.zoneName}`, 500, 232);
+        ctx.font = "13px 'Chakra Petch', sans-serif";
+        ctx.fillText(`Thưởng: ${moneyLabel(o.reward)} (+2 Danh tiếng) · Hạn chót: ${o.deadlineHour}:00`, 500, 260);
+        ctx.fillStyle = hasIng ? "#2f6b2f" : "#a83232";
+        ctx.fillText(
+            `Nguyên liệu: ☕${o.coffeeNeed}  🥛${o.milkNeed}  🍊${o.fruitNeed} (${hasIng ? 'Đủ nguyên liệu' : 'Thiếu nguyên liệu'})`,
+            500,
+            286
+        );
+        pOutlinedRect(ctx, 250, 306, 300, 38, inTarget && hasIng ? "#9ed178" : "#d9cbb3");
+        ctx.fillStyle = PAL.OUTLINE;
+        ctx.font = "bold 14px 'Chakra Petch', sans-serif";
+        ctx.fillText(inTarget ? "✅ Giao đơn ngay" : `📍 Đến ${o.zoneName} để giao`, 400, 330);
+        pOutlinedRect(ctx, 570, 306, 180, 38, "#e8a598");
+        ctx.fillText("❌ Hủy đơn", 660, 330);
+    } else {
+        if (!deliveryOffers.length) generateDeliveryOffers();
+        deliveryOffers.forEach((offer, idx) => {
+            const y = 168 + idx * 96;
+            const hasIng = canFulfillDelivery(offer);
+            pOutlinedRect(ctx, 210, y, 580, 82, "#fff3d6");
+            ctx.fillStyle = PAL.OUTLINE;
+            ctx.textAlign = "left";
+            ctx.font = "bold 15px 'Chakra Petch', sans-serif";
+            ctx.fillText(`${offer.cups}x ${offer.recipeName} → ${offer.zoneName}`, 228, y + 27);
+            ctx.font = "13px 'Chakra Petch', sans-serif";
+            ctx.fillText(
+                `Khách: ${offer.customerName} · Hạn: ${offer.deadlineHour}:00 · Cần: ☕${offer.coffeeNeed} 🥛${offer.milkNeed} 🍊${offer.fruitNeed}`,
+                228,
+                y + 50
+            );
+            ctx.fillStyle = hasIng ? "#2f6b2f" : "#9c4b2d";
+            ctx.fillText(hasIng ? "✓ Đủ nguyên liệu" : "⚠ Cần mua thêm nguyên liệu", 228, y + 70);
+            ctx.textAlign = "center";
+            pOutlinedRect(ctx, 625, y + 19, 148, 44, "#aaca8c");
+            ctx.fillStyle = PAL.OUTLINE;
+            ctx.font = "bold 14px 'Chakra Petch', sans-serif";
+            ctx.fillText(`Nhận (${moneyLabel(offer.reward)})`, 699, y + 46);
+        });
+    }
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = PAL.OUTLINE;
+    ctx.font = "bold 14px 'Chakra Petch', sans-serif";
+    if (!activeDeliveryOrder) {
+        pOutlinedRect(ctx, 240, 496, 220, 38, "#d9c29c");
+        ctx.fillText("🔄 Đổi đơn mới", 350, 520);
+        pOutlinedRect(ctx, 540, 496, 220, 38, "#f0b643");
+        ctx.fillText("Đóng [Q / F]", 650, 520);
+    } else {
+        pOutlinedRect(ctx, 410, 496, 180, 38, "#f0b643");
+        ctx.fillText("Đóng [Q / F]", 500, 520);
+    }
+}
+
+function handleDeliveryModalClick(x, y) {
+    if (activeDeliveryOrder) {
+        if (x >= 410 && x <= 590 && y >= 496 && y <= 534) {
+            showDeliveryModal = false;
+            GameAudio?.playModalClose();
+            return;
+        }
+        if (x >= 250 && x <= 550 && y >= 306 && y <= 344) {
+            deliverActiveOrder();
+            return;
+        }
+        if (x >= 570 && x <= 750 && y >= 306 && y <= 344) {
+            activeDeliveryOrder = null;
+            GameAudio?.playClick();
+            showToast("❌ Đã hủy đơn giao hàng hiện tại.");
+            return;
+        }
+        return;
+    }
+    if (x >= 240 && x <= 460 && y >= 496 && y <= 534) {
+        generateDeliveryOffers();
+        GameAudio?.playClick();
+        return;
+    }
+    if (x >= 540 && x <= 760 && y >= 496 && y <= 534) {
+        showDeliveryModal = false;
+        GameAudio?.playModalClose();
+        return;
+    }
+    for (let idx = 0; idx < deliveryOffers.length; idx++) {
+        const cardY = 168 + idx * 96;
+        if (x >= 625 && x <= 773 && y >= cardY + 19 && y <= cardY + 63) {
+            acceptDeliveryOffer(idx);
+            return;
+        }
+    }
+}
 let dailyLoanPayment = 0;
 let customerReputation = 0;
 const loanProducts = [
@@ -3558,6 +4464,42 @@ function drawBusinessDraft(rental) {
     ctx.fillText(draft.confirming ? "Xác nhận trả " + moneyLabel(quote.deposit) : "Chọn phương án này", 450, 509);
 }
 
+function clearCartCustomers() {
+    streetCustomers.forEach((c) => {
+        if ((c.state === 'going_to_spot' || c.state === 'waiting_order') && c.targetSpotId === 'cart_mobile') {
+            c.state = 'wandering';
+            c.targetSpotId = null;
+            c.orderTimer = 0;
+        }
+    });
+}
+
+function toggleCoffeeCartOpen() {
+    if (coffeeCart.isPushed) {
+        GameAudio?.playError();
+        showToast("Hãy nhấn [G] đậu Xe Cà Phê xuống trước rồi mới đóng/mở bán.");
+        return;
+    }
+    if (coffeeCart.zone === currentZone) {
+        const cx = coffeeCart.x + 44;
+        const cy = coffeeCart.y + 32;
+        if (Math.hypot((player.x + 18) - cx, (player.y + 24) - cy) < 105) {
+            coffeeCart.isOpen = !coffeeCart.isOpen;
+            GameAudio?.playCartToggle();
+            if (!coffeeCart.isOpen) {
+                if (showBrewModal && activeBrewSpot?.spotId === 'cart_mobile') showBrewModal = false;
+                clearCartCustomers();
+                showToast("🔒 Đã đóng cửa Xe Cà Phê 5AM! Khách sẽ không gọi món nữa (nhấn [C] để mở lại).", 200);
+            } else {
+                spotOrderCooldown = Math.min(spotOrderCooldown, 180);
+                showToast("☕ Đã mở cửa Xe Cà Phê 5AM! Sẵn sàng đón khách.", 180);
+            }
+            return;
+        }
+    }
+    showToast("💡 Lại gần Xe Cà Phê của bạn rồi nhấn [C] để đóng/mở cửa bán hàng!");
+}
+
 function togglePushCoffeeCart() {
     if (activeVehicle) {
         GameAudio?.playError();
@@ -3589,6 +4531,7 @@ function togglePushCoffeeCart() {
         const cy = coffeeCart.y + 32;
         if (Math.hypot((player.x + 18) - cx, (player.y + 24) - cy) < 105) {
             coffeeCart.isPushed = true;
+            clearCartCustomers();
             GameAudio?.playCartToggle();
             showToast("🛒 Đang đẩy Xe Cà Phê 5AM! Đi sang Công Viên hoặc khu khác rồi nhấn [G] để đậu xe.", 200);
             return;
@@ -3644,6 +4587,10 @@ canvas.addEventListener('click', function (event) {
         if (authOpen) return;
         if (showHandbookModal) {
             handleHandbookModalClick(mouseX, mouseY);
+            return;
+        }
+        if (showDeliveryModal) {
+            handleDeliveryModalClick(mouseX, mouseY);
             return;
         }
         if (showSettingsModal) {
@@ -3805,6 +4752,10 @@ canvas.addEventListener('click', function (event) {
             handleHandbookModalClick(mouseX, mouseY);
             return;
         }
+        if (showDeliveryModal) {
+            handleDeliveryModalClick(mouseX, mouseY);
+            return;
+        }
         if (mouseX >= 840 && mouseX <= 988 && mouseY >= 40 && mouseY <= 68) {
             if (showHandbookModal && handbookTab === 'guide') {
                 showHandbookModal = false;
@@ -3830,11 +4781,17 @@ canvas.addEventListener('click', function (event) {
                 }
             } else if (showMarketModal) handleMarketModalClick(mouseX, mouseY);
             else if (showBrewModal) handleBrewModalClick(mouseX, mouseY);
-            else if (mouseY >= 389 && mouseY <= 452) {
-                const visitor = getShopVisitors(indoorShop).find((npc, index) => Math.abs(mouseX - (357 + index * 142)) < 56);
+            else if (indoorShop.nightlife && indoorShop.name.includes("SKYLINE") && Math.abs(mouseX - 384) < 48 && mouseY >= 200 && mouseY <= 275) {
+                const kyDuyen = getShopVisitors(indoorShop).find((npc) => npc.id === 'ky_duyen');
+                if (kyDuyen) openNPCDialogue(kyDuyen);
+            } else if (mouseY >= 389 && mouseY <= 452) {
+                const floorVisitors = indoorShop.nightlife && indoorShop.name.includes("SKYLINE")
+                    ? getShopVisitors(indoorShop).filter((npc) => npc.id !== 'ky_duyen')
+                    : getShopVisitors(indoorShop);
+                const visitor = floorVisitors.find((npc, index) => Math.abs(mouseX - getShopVisitorX(index, floorVisitors.length)) < 50);
                 if (visitor) openNPCDialogue(visitor);
             } else if (mouseX >= 431 && mouseX <= 569 && mouseY >= 501 && mouseY <= 533) leaveShop();
-            else if (mouseX >= 334 && mouseX <= 666 && mouseY >= 198 && mouseY <= 270) useShopCounter();
+            else if (mouseX >= (indoorShop.nightlife ? 556 : 334) && mouseX <= (indoorShop.nightlife ? 764 : 666) && mouseY >= 198 && mouseY <= 270) useShopCounter();
             return;
         }
 
@@ -3988,6 +4945,11 @@ canvas.addEventListener('click', function (event) {
             // Click vào Xe Đẩy Cà Phê di động (khi đang đậu ở khu phố hiện tại)
             if (coffeeCart.zone === currentZone && !coffeeCart.isPushed) {
                 if (worldClickX >= coffeeCart.x - 10 && worldClickX <= coffeeCart.x + 98 && worldClickY >= coffeeCart.y - 45 && worldClickY <= coffeeCart.y + 60) {
+                    if (!coffeeCart.isOpen) {
+                        GameAudio?.playError();
+                        showToast("🔒 Xe Cà Phê đang đóng cửa! Nhấn [C] để mở bán lại.");
+                        return;
+                    }
                     activeBrewSpot = { spotId: 'cart_mobile', name: "Xe Đẩy Cà Phê 5AM", zoneId: currentZone };
                     showBrewModal = true;
                     return;
@@ -4002,22 +4964,26 @@ canvas.addEventListener('click', function (event) {
 // CẬP NHẬT DI CHUYỂN, VA CHẠM VẬT LÝ & CAMERA TRƯỢT MƯỢT MÀ
 // ============================================================================
 
-function checkWorldCollision(nx, ny, colliders) {
+function checkWorldCollision(nx, ny, colliders, curX = null, curY = null) {
     if (!colliders || colliders.length === 0) return false;
     // Hitbox ở phần chân nhân vật để tạo cảm giác 2.5D tự nhiên giống Stardew Valley
     const footX = nx + 6;
     const footY = ny + 20;
     const footW = 24;
     const footH = 18;
+    const hasCur = curX !== null && curY !== null;
+    const curFootX = hasCur ? curX + 6 : footX;
+    const curFootY = hasCur ? curY + 20 : footY;
     for (const box of colliders) {
-        if (
-            footX < box.x + box.w &&
-            footX + footW > box.x &&
-            footY < box.y + box.h &&
-            footY + footH > box.y
-        ) {
-            return true;
+        const hitNext = footX < box.x + box.w && footX + footW > box.x &&
+                        footY < box.y + box.h && footY + footH > box.y;
+        if (!hitNext) continue;
+        if (box.dynamic && hasCur) {
+            const hitCur = curFootX < box.x + box.w && curFootX + footW > box.x &&
+                           curFootY < box.y + box.h && curFootY + footH > box.y;
+            if (hitCur) continue; // Tránh kẹt nếu NPC tự đi đụng vào người chơi đang đứng yên
         }
+        return true;
     }
     return false;
 }
@@ -4050,12 +5016,12 @@ function updatePlayerMovement(minX, maxX, minY, maxY, colliders = null) {
 
         // Tách trục X và Y để trượt dọc mép tường mượt mà
         const nextX = Math.max(minX, Math.min(maxX - player.size, player.x + stepX));
-        if (!checkWorldCollision(nextX, player.y, colliders)) {
+        if (!checkWorldCollision(nextX, player.y, colliders, player.x, player.y)) {
             player.x = nextX;
         }
 
         const nextY = Math.max(minY, Math.min(maxY - player.size, player.y + stepY));
-        if (!checkWorldCollision(player.x, nextY, colliders)) {
+        if (!checkWorldCollision(player.x, nextY, colliders, player.x, player.y)) {
             player.y = nextY;
         }
 
@@ -4188,7 +5154,7 @@ function updateShopCustomers(festival = null) {
     if (festivalSelling) {
         activeSpots.push({ spotId: 'festival_stall', x: festivalStall.x - 45, y: festivalStall.y + 48 });
     }
-    if (!festival && coffeeCart.zone === currentZone && !coffeeCart.isPushed) {
+    if (!festival && coffeeCart.zone === currentZone && !coffeeCart.isPushed && coffeeCart.isOpen) {
         activeSpots.push({ spotId: 'cart_mobile', x: coffeeCart.x + 26, y: coffeeCart.y + 52 });
     }
     (GAME_CONFIG.RENTALS[currentZone] || []).forEach((r) => {
@@ -4289,7 +5255,21 @@ function updateShopCustomers(festival = null) {
 function updateStreet() {
     const zoneCfg = GAME_CONFIG.ZONES[currentZone];
     const conn = zoneCfg ? zoneCfg.connections : {};
-    const colliders = zoneColliders[currentZone] || [];
+    const colliders = [...(zoneColliders[currentZone] || [])];
+    if (coffeeCart.zone === currentZone && !coffeeCart.isPushed) {
+        colliders.push({ x: coffeeCart.x + 4, y: coffeeCart.y + 8, w: 80, h: 40, dynamic: true });
+    }
+    storyNPCs.forEach((npc) => {
+        if (npc.meeting?.zone === currentZone && !npc.meeting.shop) {
+            colliders.push({ x: npc.x + 6, y: npc.y + 18, w: 24, h: 18, dynamic: true });
+        }
+    });
+    streetCustomers.forEach((cust) => {
+        colliders.push({ x: cust.x + 6, y: cust.y + 18, w: 24, h: 18, dynamic: true });
+    });
+    if (currentZone === 'HOME_STREET' || currentZone === 'BETTER_STREET') {
+        colliders.push({ x: vendorNPC.x + 6, y: vendorNPC.y + 18, w: 24, h: 18, dynamic: true });
+    }
 
     updatePlayerMovement(16, WORLD_W - 16, 40, WORLD_H - 40, colliders);
     updateCamera(false);
@@ -4368,7 +5348,9 @@ function updateStreet() {
     } else if (coffeeCart.zone === currentZone && Math.hypot((player.x + 18) - (coffeeCart.x + 44), (player.y + 24) - (coffeeCart.y + 32)) < 95) {
         nearbyInteractable = {
             type: 'BREW_SPOT',
-            label: "☕ Xe Đẩy Cà Phê 5AM - [E] Bán hàng  |  [G] Đẩy xe đi khu khác",
+            label: coffeeCart.isOpen
+                ? "☕ Xe Đẩy Cà Phê 5AM - [E] Bán hàng  |  [C] Đóng cửa  |  [G] Đẩy xe"
+                : "🔒 Xe Cà Phê (Đã đóng cửa) - [C] Mở bán lại  |  [G] Đẩy xe đi khu khác",
             data: { spotId: 'cart_mobile', name: "Xe Đẩy Cà Phê 5AM", zoneId: currentZone }
         };
     }
@@ -6085,7 +7067,7 @@ function drawBicycleRider(cy) {
         accessoryIndex: 0,
         accessories: [{ type: "cap" }]
     };
-    drawBitmapCharacter(x + 6, y - 18, riderCfg, dir > 0 ? 'right' : 'left', Math.floor(tickCount / 10) % 4, true, 1.05);
+    drawBitmapCharacter(x + 6, y - 14, riderCfg, dir > 0 ? 'right' : 'left', 0, false, 1.05, true);
 }
 
 function drawBreezeSeasonDecorations() {
@@ -6209,6 +7191,12 @@ function drawCoffeeCartInWorld() {
     pRect(ctx, cx - 4, cy + 48, 96, 12, "rgba(43, 29, 22, 0.38)");
     pOutlinedRect(ctx, cx, cy, 88, 50, "#b8bfc4");
     pOutlinedRect(ctx, cx, cy - 34, 88, 36, "rgba(220, 235, 242, 0.78)");
+    if (!coffeeCart.isOpen && !coffeeCart.isPushed) {
+        pRect(ctx, cx + 2, cy - 32, 84, 32, "#5c4a42");
+        for (let sy = cy - 26; sy < cy - 2; sy += 6) {
+            pRect(ctx, cx + 4, sy, 80, 2, "#3a2e28");
+        }
+    }
     drawStripedAwning(ctx, cx - 6, cy - 50, 100, 20, "#c84b31", "#f0b643");
     pOutlinedRect(ctx, cx + 8, cy + 42, 16, 16, "#262626");
     pOutlinedRect(ctx, cx + 62, cy + 42, 16, 16, "#262626");
@@ -6224,10 +7212,13 @@ function drawCoffeeCartInWorld() {
         pOutlinedRect(ctx, cx + 92, cy + 46, 12, 10, "#2980b9");
         pOutlinedRect(ctx, cx + 110, cy + 46, 12, 10, "#c0392b");
     }
-    ctx.fillStyle = PAL.SIGN_RED;
+    ctx.fillStyle = (!coffeeCart.isOpen && !coffeeCart.isPushed) ? "#6d5b53" : PAL.SIGN_RED;
     ctx.font = "bold 11px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(coffeeCart.isPushed ? "🛒 ĐANG ĐẨY" : "☕ XE CÀ PHÊ 5AM", cx + 44, cy + 30);
+    ctx.fillText(
+        coffeeCart.isPushed ? "🛒 ĐANG ĐẨY" : (coffeeCart.isOpen ? "☕ XE CÀ PHÊ 5AM" : "🔒 ĐÃ ĐÓNG CỬA"),
+        cx + 44, cy + 30
+    );
 }
 
 function drawScreenPopups() {
@@ -6299,8 +7290,12 @@ function drawGarage() {
 function drawOwnedVehicle(vehicle) {
     if (vehicle.id === 'bike') {
         drawBikeFrame(ctx, player.x + 1, player.y + 11, vehicle.color);
+        drawBitmapCharacter(player.x + 2, player.y - 13, playerConfig, player.dir, 0, false, 1.35, true);
+        return;
     } else if (vehicle.id === 'scooter') {
         drawParkedScooter(ctx, player.x - 5, player.y + 15, vehicle.color, true, 1.3, player.dir === 'left');
+        drawBitmapCharacter(player.x + 3, player.y - 10, playerConfig, player.dir, 0, false, 1.3, true);
+        return;
     } else {
         const vertical = player.dir === 'up' || player.dir === 'down';
         const reverse = player.dir === 'left' || player.dir === 'up';
@@ -6360,15 +7355,77 @@ function drawStreet() {
     drawRentalBadgesInWorld();
     drawCoffeeCartInWorld();
     drawZoneAmbientEffectsInWorld();
+    if (currentZone === 'DISTRICT_1' && playerStats.hour >= 16 && playerStats.hour < 24) {
+        // Khách ngồi ăn tại bàn ngoài trời & người ra vào Quán Nướng
+        const bbqDiners = [
+            { x: 1532, y: 292, dir: 'down', shirt: '#d35400', shadow: '#873600' },
+            { x: 1554, y: 422, dir: 'up', shirt: '#2980b9', shadow: '#1b4f72' },
+            { x: 1738, y: 384, dir: 'down', shirt: '#8e44ad', shadow: '#5b2c6f' },
+            { x: 1794, y: 292, dir: 'down', shirt: '#27ae60', shadow: '#196f3d' }
+        ];
+        bbqDiners.forEach((d) => {
+            drawBitmapCharacter(d.x, d.y, {
+                genderIndex: 0, outfitIndex: 0,
+                outfits: [{ color: d.shirt, shadow: d.shadow, shorts: '#2c3e50' }],
+                accessoryIndex: 0, accessories: [{ type: 'none' }]
+            }, d.dir, 0, false, 1.25, true);
+        });
+        const t = performance.now() / 1000;
+        const walk1Y = 382 + ((Math.sin(t * 1.1) + 1) * 0.5) * 44;
+        const walk1Dir = Math.cos(t * 1.1) >= 0 ? 'down' : 'up';
+        drawBitmapCharacter(1660, walk1Y, {
+            genderIndex: 1, outfitIndex: 0,
+            outfits: [{ color: '#e67e22', shadow: '#a04000', shorts: '#34495e' }],
+            accessoryIndex: 0, accessories: [{ type: 'none' }]
+        }, walk1Dir, Math.floor(tickCount / 10) % 4, true, 1.35);
+        const walk2Y = 426 - ((Math.sin(t * 0.85 + 1.8) + 1) * 0.5) * 42;
+        const walk2Dir = Math.cos(t * 0.85 + 1.8) >= 0 ? 'up' : 'down';
+        drawBitmapCharacter(1692, walk2Y, {
+            genderIndex: 0, outfitIndex: 0,
+            outfits: [{ color: '#16a085', shadow: '#0e6251', shorts: '#2c3e50' }],
+            accessoryIndex: 0, accessories: [{ type: 'none' }]
+        }, walk2Dir, Math.floor(tickCount / 10) % 4, true, 1.35);
+    }
     for (const shop of shopsByZone[currentZone] || []) {
         if (!shopIsOpen(shop)) continue;
         const left = shop.x + (shop.w - shop.gateW) / 2;
         const top = shop.y + shop.h - 68;
-        const light = shop.nightlife ? "#bc6df0" : shop.food ? "#f0a257" : "#dfc37b";
+        const isBBQ = shop.name.includes("NƯỚNG");
+        const isParty = Boolean(shop.nightlife || isBBQ);
+        const beat = Math.floor(performance.now() / (shop.nightlife ? 180 : 250));
+        const palette = shop.nightlife
+            ? ['#ff2e93', '#00e5ff', '#ffe600', '#b84dff']
+            : ['#ff5722', '#ff9800', '#ffd54f', '#ff3d00'];
+        const light = isParty ? palette[beat % palette.length] : (shop.food ? "#f0a257" : "#dfc37b");
         pOutlinedRect(ctx, left, top, shop.gateW, 68, "#2d2132");
         pRect(ctx, left + 4, top + 3, shop.gateW - 8, 4, light);
         pRect(ctx, left + 5, top + 48, shop.gateW - 10, 15, light);
-        pRect(ctx, left + 8, top + 69, shop.gateW - 16, 10, "rgba(245,185,104,0.35)");
+        pRect(ctx, left + 8, top + 69, shop.gateW - 16, 10, isParty ? light : "rgba(245,185,104,0.35)");
+        if (isParty) {
+            // Dải đèn LED xập xình dọc mái hiên & luồng sáng trước cửa
+            for (let i = 0; i < 6; i++) {
+                const bulbCol = palette[(i + beat) % palette.length];
+                pRect(ctx, shop.x + 12 + i * ((shop.w - 28) / 5), top - 8, 7, 7, bulbCol);
+            }
+            ctx.save();
+            ctx.globalAlpha = 0.22;
+            ctx.fillStyle = palette[(beat + 1) % palette.length];
+            const sweep = Math.sin(performance.now() / 320) * 26;
+            ctx.beginPath();
+            ctx.moveTo(left + shop.gateW * 0.3, top + 6);
+            ctx.lineTo(left - 18 + sweep, top + 96);
+            ctx.lineTo(left + 32 + sweep, top + 96);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = palette[(beat + 3) % palette.length];
+            ctx.beginPath();
+            ctx.moveTo(left + shop.gateW * 0.7, top + 6);
+            ctx.lineTo(left + shop.gateW - 32 - sweep, top + 96);
+            ctx.lineTo(left + shop.gateW + 18 - sweep, top + 96);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
     }
     drawDirectionSignpostsInWorld();
     for (const spot of npcMeetingSpots) {
@@ -6380,8 +7437,10 @@ function drawStreet() {
     }
 
     if (activeVehicle) drawOwnedVehicle(activeVehicle);
-    else {
-        if (ridingBicycle) drawBikeFrame(ctx, player.x + 1, player.y + 11, "#d07359");
+    else if (ridingBicycle) {
+        drawBikeFrame(ctx, player.x + 1, player.y + 11, "#d07359");
+        drawBitmapCharacter(player.x + 2, player.y - 13, playerConfig, player.dir, 0, false, 1.35, true);
+    } else {
         drawBitmapCharacter(player.x, player.y, playerConfig, player.dir, player.animFrame, player.isMoving, 1.5);
     }
     drawPlayerNameLabel(player.x, player.y);
@@ -6394,15 +7453,32 @@ function drawStreet() {
 
     // 3. Giao diện HUD cố định trên màn hình
     const zInfo = GAME_CONFIG.ZONES[currentZone];
-    pOutlinedRect(ctx, 14, canvas.height - 38, 675, 30, "#ecd3ab");
+    const hasShip = hasDeliveryVehicle();
+    pOutlinedRect(ctx, 14, canvas.height - 38, hasShip ? 745 : 675, 30, "#ecd3ab");
     ctx.font = "bold 12px 'Chakra Petch', sans-serif";
     ctx.fillStyle = PAL.OUTLINE;
     ctx.textAlign = "left";
     ctx.fillText(
-        "[E] Tương tác  |  [G] Xe cà phê  |  [V] Xe cá nhân  |  [M] Sơ đồ",
+        hasShip
+            ? "[E] Tương tác  |  [F] Ship hàng  |  [G] Xe cà phê  |  [V] Xe cá nhân  |  [M] Sơ đồ"
+            : "[E] Tương tác  |  [G] Xe cà phê  |  [V] Xe cá nhân  |  [M] Sơ đồ",
         26,
         canvas.height - 19
     );
+
+    if (activeDeliveryOrder) {
+        const atTarget = currentZone === activeDeliveryOrder.zoneKey;
+        pOutlinedRect(ctx, 14, 118, 320, 28, atTarget ? "#b6d6a0" : "#ffe6a7");
+        ctx.fillStyle = PAL.OUTLINE;
+        ctx.font = "bold 12px 'Chakra Petch', sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(
+            `🛵 Ship: ${activeDeliveryOrder.cups}x ${activeDeliveryOrder.recipeName} → ${activeDeliveryOrder.zoneName} (<${activeDeliveryOrder.deadlineHour}:00)`,
+            24,
+            136,
+            300
+        );
+    }
 
     drawInteractionBanner();
     drawMinimalHUD((zInfo ? zInfo.name : "Khu phố") + " (x" + (zInfo ? zInfo.priceMultiplier : 1) + ")");
@@ -6736,7 +7812,9 @@ function gameLoop(now = performance.now()) {
         });
     }
 
+    checkDeliveryExpiration();
     if (showHandbookModal) drawHandbookModal();
+    if (showDeliveryModal) drawDeliveryModal();
 
     requestAnimationFrame(gameLoop);
 }
@@ -6755,7 +7833,8 @@ function exportSaveData() {
             zone: b.zone,
             pending: Boolean(b.pending),
             opensDay: b.opensDay,
-            upgrades: b.upgrades || {}
+            upgrades: b.upgrades || {},
+            hasStaff: Boolean(b.hasStaff)
         };
     }
     const npcStates = {};
@@ -6803,7 +7882,9 @@ function exportSaveData() {
         briefedPhase,
         briefedEventDay,
         yearFestivals,
-        dailyEventId: dailyEvent?.id || null
+        dailyEventId: dailyEvent?.id || null,
+        activeDeliveryOrder,
+        deliveryCompletedToday
     };
 }
 
@@ -6840,7 +7921,8 @@ function applySaveData(data) {
                     zone: b.zone || 'HOME_STREET',
                     pending: Boolean(b.pending),
                     opensDay: b.opensDay || 1,
-                    upgrades: b.upgrades || {}
+                    upgrades: b.upgrades || {},
+                    hasStaff: Boolean(b.hasStaff)
                 };
             }
         }
@@ -6866,6 +7948,9 @@ function applySaveData(data) {
     briefedEventDay = data.briefedEventDay || 0;
     if (Array.isArray(data.yearFestivals) && data.yearFestivals.length) yearFestivals = data.yearFestivals;
     dailyEvent = data.dailyEventId ? (DAILY_EVENTS.find((ev) => ev.id === data.dailyEventId) || null) : null;
+    activeDeliveryOrder = data.activeDeliveryOrder || null;
+    deliveryCompletedToday = data.deliveryCompletedToday || 0;
+    deliveryOffers = [];
 
     currentZone = data.currentZone || 'HOME_STREET';
     if (data.playerPos) {
