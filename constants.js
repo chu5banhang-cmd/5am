@@ -63,6 +63,7 @@ const GAME_CONFIG = {
 
     // Trạng thái màn hình game (Game States)
     STATES: {
+        WELCOME: 'WELCOME',
         MENU: 'MENU',
         CHARACTER_CREATION: 'CHARACTER_CREATION',
         INTRO: 'INTRO',

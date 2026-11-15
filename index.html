@@ -24,9 +24,31 @@
                 <input type="number" id="playerBirthdayInput" min="1" max="100" step="1" value="1" required>
             </div>
         </div>
+        <div id="authModal" hidden>
+            <div class="auth-card">
+                <div class="auth-header">
+                    <span>👤 TÀI KHOẢN CLOUD 5AM</span>
+                    <button type="button" id="authCloseBtn">✖</button>
+                </div>
+                <div class="auth-tabs">
+                    <button type="button" id="authTabLogin" class="active">ĐĂNG NHẬP</button>
+                    <button type="button" id="authTabRegister">ĐĂNG KÝ</button>
+                </div>
+                <div class="auth-body">
+                    <label for="authUserInput">Tên đăng nhập (hoặc Email)</label>
+                    <input type="text" id="authUserInput" placeholder="vd: chiquan5am" autocomplete="username">
+                    <label for="authPassInput">Mật khẩu (tối thiểu 6 ký tự)</label>
+                    <input type="password" id="authPassInput" placeholder="••••••" autocomplete="current-password">
+                    <div id="authStatusText"></div>
+                    <button type="button" id="authSubmitBtn">ĐĂNG NHẬP</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="constants.js"></script>
+    <script src="audio.js"></script>
+    <script src="cloud.js"></script>
     <script src="game.js"></script>
 </body>
 </html>
