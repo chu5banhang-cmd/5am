@@ -115,16 +115,25 @@ const GAME_CONFIG = {
             name: 'Cà Phê Đen Đá',
             icon: '☕',
             need: { coffee: 1 },
-            baseSellPrice: 22000,
+            baseSellPrice: 18000,
             energyCost: 4,
             desc: 'Cà phê phin truyền thống tỉnh táo tức thì (Cần: 1 Cà phê)'
+        },
+        {
+            id: 'ca_phe_sua',
+            name: 'Cà Phê Sữa Đá',
+            icon: '🧋',
+            need: { coffee: 1, milk: 1 },
+            baseSellPrice: 24000,
+            energyCost: 4,
+            desc: 'Cà phê sữa đá quốc dân Sài Gòn (Cần: 1 Cà phê + 1 Sữa)'
         },
         {
             id: 'bac_xiu',
             name: 'Bạc Xỉu Hẻm Sài Gòn',
             icon: '🥛',
             need: { coffee: 1, milk: 1 },
-            baseSellPrice: 35000,
+            baseSellPrice: 28000,
             energyCost: 5,
             desc: 'Sữa nóng quyện chút cà phê thơm lừng (Cần: 1 Cà phê + 1 Sữa)'
         },
@@ -133,9 +142,27 @@ const GAME_CONFIG = {
             name: 'Trà Cam Sả Nhiệt Đới',
             icon: '🍹',
             need: { coffee: 1, fruit: 1 },
-            baseSellPrice: 42000,
+            baseSellPrice: 34000,
             energyCost: 5,
             desc: 'Thanh mát giải nhiệt ngày nắng Sài Gòn (Cần: 1 Cà phê + 1 Trái cây)'
+        },
+        {
+            id: 'cam_ep',
+            name: 'Nước Cam Ép Tươi',
+            icon: '🍊',
+            need: { fruit: 2 },
+            baseSellPrice: 30000,
+            energyCost: 4,
+            desc: 'Giải nhiệt không caffeine ngày nắng gắt (Cần: 2 Trái cây)'
+        },
+        {
+            id: 'cold_brew_dac_biet',
+            name: 'Cold Brew Cam Sữa',
+            icon: '✨',
+            need: { coffee: 1, milk: 1, fruit: 1 },
+            baseSellPrice: 44000,
+            energyCost: 6,
+            desc: 'Món đặc biệt lãi cao cho khu trung tâm (Cần: 1 Cà phê + 1 Sữa + 1 Cam)'
         }
     ],
 

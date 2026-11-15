@@ -8,7 +8,12 @@
         const clean = String(input || '').trim();
         if (!clean) return '';
         if (clean.includes('@')) return clean.toLowerCase();
-        const safeUser = clean.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+        const ascii = clean
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/đ/gi, 'd')
+            .toLowerCase();
+        const safeUser = ascii.replace(/[^a-z0-9._-]/g, '');
         return safeUser ? `${safeUser}@5amgame.com` : '';
     }
 
