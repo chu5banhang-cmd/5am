@@ -546,6 +546,8 @@ window.addEventListener('keydown', function (e) {
                     : getShopVisitors(indoorShop);
                 const visitor = floorVisitors.find((npc, index) => Math.abs(player.x - getShopVisitorX(index, floorVisitors.length)) < 52);
                 if (visitor) openNPCDialogue(visitor);
+            } else if (low === 'e' && !isAnyModalOpen() && indoorShop.name.includes("BỆNH VIỆN") && player.x >= 775 && player.y <= 280) {
+                switchHospitalFloor((hospitalFloor + 1) % 3);
             } else if (low === 'e' && !isAnyModalOpen() && player.y < (indoorShop.name.includes("BỆNH VIỆN") ? 305 : 315) &&
                 player.x >= (indoorShop.nightlife ? 530 : 320) && player.x <= (indoorShop.nightlife ? 775 : 680)) useShopCounter();
             else if (!isAnyModalOpen() && indoorShop.name.includes("BỆNH VIỆN") && /^[1-3]$/.test(low)) {
@@ -2273,26 +2275,26 @@ function updateShopInterior() {
         if (hospitalFloor === 0) {
             hospitalColliders.push(
                 { x: 118, y: 240, w: 120, h: 72 },
-                { x: 762, y: 240, w: 120, h: 72 },
+                { x: 762, y: 326, w: 120, h: 72 },
                 { x: 118, y: 452, w: 150, h: 36 },
-                { x: 732, y: 452, w: 150, h: 36 }
+                { x: 732, y: 462, w: 150, h: 36 }
             );
         } else if (hospitalFloor === 1) {
             hospitalColliders.push(
                 { x: 118, y: 260, w: 110, h: 86 },
                 { x: 118, y: 390, w: 110, h: 86 },
-                { x: 772, y: 260, w: 110, h: 86 },
-                { x: 732, y: 446, w: 150, h: 38 }
+                { x: 772, y: 306, w: 110, h: 86 },
+                { x: 732, y: 462, w: 150, h: 38 }
             );
         } else {
             hospitalColliders.push(
                 { x: 118, y: 248, w: 132, h: 96 },
-                { x: 750, y: 248, w: 132, h: 96 },
+                { x: 750, y: 310, w: 132, h: 96 },
                 { x: 130, y: 420, w: 140, h: 52 },
-                { x: 730, y: 420, w: 140, h: 52 }
+                { x: 730, y: 444, w: 140, h: 52 }
             );
         }
-        updatePlayerMovement(102, 898, 252, 578, hospitalColliders);
+        updatePlayerMovement(102, 898, 232, 578, hospitalColliders);
         if (player.isMoving && lyingOnHospitalBed) lyingOnHospitalBed = false;
         if (!isAnyModalOpen() && player.y >= 546 && player.x >= 435 && player.x <= 545 &&
             (keys.s || keys.ArrowDown)) leaveShop();
@@ -2440,28 +2442,28 @@ function drawHospitalInterior(shop) {
     };
 
     if (hospitalFloor === 0) {
-        // Tầng Trệt: 2 Khoang Cấp Cứu trái/phải + Tủ thuốc + Ghế chờ
+        // Tầng Trệt: 2 Khoang Cấp Cứu trái/phải + Ghế chờ (chừa lối đi lên thang máy góc trên phải)
         pOutlinedRect(ctx, 100, 200, 210, 140, "rgba(217, 56, 58, 0.12)");
-        pOutlinedRect(ctx, 690, 200, 210, 140, "rgba(217, 56, 58, 0.12)");
+        pOutlinedRect(ctx, 690, 286, 210, 140, "rgba(217, 56, 58, 0.12)");
         drawMedicalBed(118, 242, false);
-        drawMedicalBed(762, 242, false);
+        drawMedicalBed(762, 328, false);
         ctx.fillStyle = "#b71c1c";
         ctx.font = "bold 11.5px 'Chakra Petch', sans-serif";
         ctx.fillText("GIƯỜNG CẤP CỨU 01", 175, 330);
-        ctx.fillText("GIƯỜNG CẤP CỨU 02", 818, 330);
+        ctx.fillText("GIƯỜNG CẤP CỨU 02", 818, 416);
 
         // Hàng ghế chờ cấp cứu dưới
-        for (const gx of [118, 732]) {
-            pOutlinedRect(ctx, gx, 452, 150, 34, "#2b7a9b");
-            for (let i = 0; i < 3; i++) pOutlinedRect(ctx, gx + 8 + i * 48, 458, 38, 22, "#80deea");
+        for (const [gx, gy] of [[118, 452], [732, 462]]) {
+            pOutlinedRect(ctx, gx, gy, 150, 34, "#2b7a9b");
+            for (let i = 0; i < 3; i++) pOutlinedRect(ctx, gx + 8 + i * 48, gy + 6, 38, 22, "#80deea");
         }
     } else if (hospitalFloor === 1) {
         // Tầng 1: 3 Giường Truyền Nước + Bảng đo thị lực + Ghế chờ
         drawMedicalBed(118, 268, false);
         drawMedicalBed(118, 396, false);
-        drawMedicalBed(772, 268, false);
-        pOutlinedRect(ctx, 732, 446, 150, 36, "#2b7a9b");
-        for (let i = 0; i < 3; i++) pOutlinedRect(ctx, 740 + i * 48, 452, 38, 24, "#80deea");
+        drawMedicalBed(772, 314, false);
+        pOutlinedRect(ctx, 732, 462, 150, 36, "#2b7a9b");
+        for (let i = 0; i < 3; i++) pOutlinedRect(ctx, 740 + i * 48, 468, 38, 24, "#80deea");
         // Bảng thị lực treo tường
         pOutlinedRect(ctx, 272, 88, 32, 46, "#ffffff");
         ctx.fillStyle = "#263238";
@@ -2472,14 +2474,14 @@ function drawHospitalInterior(shop) {
     } else {
         // Tầng 2: 2 Phòng Hồi Sức VIP + Sofa + Bàn trà hoa + TV
         pOutlinedRect(ctx, 98, 198, 224, 300, "rgba(46, 125, 107, 0.14)");
-        pOutlinedRect(ctx, 678, 198, 224, 300, "rgba(46, 125, 107, 0.14)");
+        pOutlinedRect(ctx, 678, 278, 224, 242, "rgba(46, 125, 107, 0.14)");
         drawMedicalBed(118, 250, true);
-        drawMedicalBed(750, 250, true);
+        drawMedicalBed(750, 312, true);
         // Sofa & Bàn trà VIP
-        for (const sx of [130, 730]) {
-            pOutlinedRect(ctx, sx, 422, 140, 24, "#2e7d6b");
-            pOutlinedRect(ctx, sx + 32, 454, 76, 28, "#8d6e63");
-            pRect(ctx, sx + 64, 460, 12, 12, "#f48fb1"); // Bình hoa bàn trà
+        for (const [sx, sy] of [[130, 422], [730, 446]]) {
+            pOutlinedRect(ctx, sx, sy, 140, 24, "#2e7d6b");
+            pOutlinedRect(ctx, sx + 32, sy + 32, 76, 28, "#8d6e63");
+            pRect(ctx, sx + 64, sy + 38, 12, 12, "#f48fb1"); // Bình hoa bàn trà
         }
         drawTerracottaPlant(ctx, 348, 480, 1.3);
         drawTerracottaPlant(ctx, 652, 480, 1.3);
@@ -3103,32 +3105,17 @@ function drawShopInterior() {
         }
     }
 
-    // Khách / NPC đang có mặt trong quán
+    // Khách / NPC đang có mặt trong quán (hoặc trực bệnh viện)
     floorVisitors.forEach((npc, index) => {
+        if (lyingOnHospitalBed && npc.id === 'bac_si_tuan') return;
         const x = getShopVisitorX(index, floorVisitors.length);
         drawBitmapCharacter(x, 401, { genderIndex: npc.genderIndex, look: npc.look, outfitIndex: 0,
             outfits: [{ color: npc.shirt, shadow: npc.shadow, shorts: npc.shorts }],
-            accessoryIndex: 0, accessories: [{ type: npc.accessory }] }, 'down', 0, false, 1.4);
+            accessoryIndex: 0, accessories: [{ type: npc.accessory || 'none' }] }, 'down', 0, false, 1.4);
         ctx.textAlign = "center";
-        ctx.fillStyle = "#fff3d6";
+        ctx.fillStyle = shop.hospital ? "#1b4965" : "#fff3d6";
         ctx.font = "bold 12px 'Chakra Petch', sans-serif";
         ctx.fillText(npc.name, x + 16, 398, 115);
-    });
-
-    // Khách / NPC đang trực hoặc có mặt trong bệnh viện (hỗ trợ nói chuyện & hẹn hò)
-    const visitors = getShopVisitors(shop);
-    visitors.forEach((npc, index) => {
-        if (lyingOnHospitalBed && npc.id === 'bac_si_tuan') return;
-        const x = getShopVisitorX(index, visitors.length);
-        drawBitmapCharacter(x, 401, {
-            genderIndex: npc.genderIndex, look: npc.look, outfitIndex: 0,
-            outfits: [{ color: npc.shirt, shadow: npc.shadow, shorts: npc.shorts }],
-            accessoryIndex: 0, accessories: [{ type: npc.accessory || 'none' }]
-        }, 'down', 0, false, 1.4);
-        ctx.textAlign = "center";
-        ctx.fillStyle = "#1b4965";
-        ctx.font = "bold 12px 'Chakra Petch', sans-serif";
-        ctx.fillText(npc.name, x + 16, 396, 120);
     });
 
     // Nếu vừa ngất xỉu tỉnh dậy: vẽ người chơi nằm trên giường cấp cứu 01 + Bác sĩ đứng cạnh giường
