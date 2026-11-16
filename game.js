@@ -147,11 +147,68 @@ function getWeatherInfo(weatherId = playerStats.weather) {
 }
 
 // Kho nguyên liệu khởi đầu tặng sẵn vài phần để người chơi thử pha chế ngay
+const INGREDIENT_SHELF_LIFE = {
+    coffee: 3, // Hạt cà phê rang: để tối đa 3 ngày
+    milk: 2,   // Sữa đặc đã khui: để tối đa 2 ngày
+    fruit: 1   // Trái cây & cam sả tươi: hư nếu để qua ngày hôm sau
+};
 let inventory = {
     coffee: 6,
     milk: 4,
     fruit: 2
 };
+let inventoryBatches = {
+    coffee: [{ qty: 6, daysLeft: INGREDIENT_SHELF_LIFE.coffee }],
+    milk: [{ qty: 4, daysLeft: INGREDIENT_SHELF_LIFE.milk }],
+    fruit: [{ qty: 2, daysLeft: INGREDIENT_SHELF_LIFE.fruit }]
+};
+
+function syncInventoryTotals() {
+    for (const k of ['coffee', 'milk', 'fruit']) {
+        const list = inventoryBatches[k] || [];
+        inventory[k] = list.reduce((sum, b) => sum + Math.max(0, b.qty || 0), 0);
+    }
+}
+
+function addInventory(ingId, amount) {
+    if (!(ingId in INGREDIENT_SHELF_LIFE) || amount <= 0) return;
+    const daysLeft = INGREDIENT_SHELF_LIFE[ingId];
+    const list = (inventoryBatches[ingId] ??= []);
+    const existing = list.find((b) => b.daysLeft === daysLeft);
+    if (existing) existing.qty += amount;
+    else list.push({ qty: amount, daysLeft });
+    syncInventoryTotals();
+}
+
+function consumeInventory(ingId, amount) {
+    if (!(ingId in INGREDIENT_SHELF_LIFE) || amount <= 0) return;
+    const list = (inventoryBatches[ingId] ??= []);
+    list.sort((a, b) => a.daysLeft - b.daysLeft);
+    let rem = amount;
+    for (const batch of list) {
+        if (rem <= 0) break;
+        const take = Math.min(batch.qty, rem);
+        batch.qty -= take;
+        rem -= take;
+    }
+    inventoryBatches[ingId] = list.filter((b) => b.qty > 0);
+    syncInventoryTotals();
+}
+
+function processDailyIngredientSpoilage() {
+    const spoiled = { coffee: 0, milk: 0, fruit: 0 };
+    for (const k of ['coffee', 'milk', 'fruit']) {
+        const kept = [];
+        for (const batch of (inventoryBatches[k] || [])) {
+            const nextDays = (batch.daysLeft || 1) - 1;
+            if (nextDays <= 0) spoiled[k] += batch.qty;
+            else kept.push({ qty: batch.qty, daysLeft: nextDays });
+        }
+        inventoryBatches[k] = kept;
+    }
+    syncInventoryTotals();
+    return spoiled;
+}
 
 const DAILY_EVENTS = [
     { id: 'market_sale', icon: '🏷️', title: 'Chợ Cô Ba xả kho', desc: 'Nguyên liệu chợ giảm thêm 25% hôm nay!', marketMult: 0.75 },
@@ -180,11 +237,24 @@ function getDailyEventSpawnMult(zoneId = currentZone) {
 }
 
 // Thống kê doanh thu trong ngày (hiển thị khi đi ngủ giống Stardew Valley)
+const HOSPITAL_FEE = 1000000;
+let faintedInHospital = false;
+const BETTER_HOSPITAL = {
+    zone: 'BETTER_STREET',
+    x: 195,
+    y: 785,
+    w: 500,
+    h: 250,
+    doorX: 428,
+    doorY: 1044
+};
+
 let dailyReport = {
     cupsSold: 0,
     revenue: 0,
     ingredientCost: 0,
     rentCost: 0,
+    hospitalCost: 0,
     latePenalty: false
 };
 
@@ -244,14 +314,26 @@ let activeDialogueNPC = null;
 
 let activeBrewSpot = null; // { spotId, name, zoneId }
 let spotOrderCooldown = 240; // ~4 giây đầu có khách đầu tiên, sau đó ~19 giây (~38 phút game) mới có khách tiếp theo
+const CART_BAIL_FEE = 2000000;
 let coffeeCart = {
     zone: 'HOME_STREET',
     x: 1110,
     y: 382,
     isPushed: false,
     isOpen: true,
+    seized: false,
     umbrella: false,
     seating: false
+};
+let marketInspector = {
+    active: false,
+    zone: null,
+    x: 0,
+    y: 0,
+    dir: -1,
+    animFrame: 0,
+    animTimer: 0,
+    patrolCooldown: 2400 + Math.floor(Math.random() * 2400)
 };
 let screenPopups = []; // Hiệu ứng bay chữ +/- trên màn hình khi mua đồ hoặc bán nước
 let toastMessage = "";
@@ -464,8 +546,11 @@ window.addEventListener('keydown', function (e) {
                     : getShopVisitors(indoorShop);
                 const visitor = floorVisitors.find((npc, index) => Math.abs(player.x - getShopVisitorX(index, floorVisitors.length)) < 52);
                 if (visitor) openNPCDialogue(visitor);
-            } else if (low === 'e' && !isAnyModalOpen() && player.y < 315 &&
-                player.x >= (indoorShop.nightlife ? 530 : 320) && player.x <= (indoorShop.nightlife ? 775 : 670)) useShopCounter();
+            } else if (low === 'e' && !isAnyModalOpen() && player.y < (indoorShop.name.includes("BỆNH VIỆN") ? 305 : 315) &&
+                player.x >= (indoorShop.nightlife ? 530 : 320) && player.x <= (indoorShop.nightlife ? 775 : 680)) useShopCounter();
+            else if (!isAnyModalOpen() && indoorShop.name.includes("BỆNH VIỆN") && /^[1-3]$/.test(low)) {
+                switchHospitalFloor(Number(low) - 1);
+            }
             else if (showBrewModal && /^[1-3]$/.test(low)) brewAndSellDrink(GAME_CONFIG.RECIPES[Number(low) - 1]);
             return;
         }
@@ -647,7 +732,9 @@ const npcLooks = {
     nhat_long:     [1.18, 1.09, 'sweep', '#47342e', 2, 'none', 'work', '#426e74', '#2d5055'],
     thao_vy:       [0.98, 1.06, 'braid', '#584033', 1, 'backpack', 'dress', '#6c91a3', '#46697a'],
     chi_man:       [1.15, 0.99, 'ponytail', '#362827', 2, 'none', 'baker', '#a26c5f', '#734a40'],
-    gia_bao:       [1.05, 1.18, 'slick', '#694733', 2, 'camera', 'plain', '#7a806c', '#525944']
+    gia_bao:       [1.05, 1.18, 'slick', '#694733', 2, 'camera', 'plain', '#7a806c', '#525944'],
+    bac_si_tuan:   [1.06, 1.12, 'crop', '#292429', 0, 'glasses', 'plain', '#ffffff', '#cfd8dc'],
+    y_ta_ngoc_han: [0.92, 1.02, 'bun', '#4e2f24', 0, 'ribbon', 'dress', '#80deea', '#4fb3bf']
 };
 
 // Nhân vật cốt truyện và cư dân có tên
@@ -1634,7 +1721,8 @@ const marriageProfiles = {
     phuong_vy: [8000000, 2], duc_anh: [6500000, 1],
     bao_ngoc: [10000000, 1], sep_hoang: [14000000, 1],
     thao_nhi: [3000000, 2], nhiep_anh_lam: [4500000, 2],
-    ky_duyen: [7000000, 1], dj_ken: [9000000, 1]
+    ky_duyen: [7000000, 1], dj_ken: [9000000, 1],
+    y_ta_ngoc_han: [4500000, 2], bac_si_tuan: [7500000, 1]
 };
 const engagementRingPrice = 3500000;
 const weddingVenuePrice = 8000000;
@@ -1746,6 +1834,10 @@ const shopMenus = [
     [/SAIGON CHIC/, [
         ['Áo khoác Đêm Sài Gòn', 220000, 'outfit', { color: '#6b4f8c', shadow: '#42305a', shorts: '#283047' }],
         ['Sơ mi Hoa Sứ', 175000, 'outfit', { color: '#f3d6a3', shadow: '#bc925f', shorts: '#536b63' }]
+    ]],
+    [/BỆNH VIỆN/, [
+        ['Truyền nước & Hồi sức (+100 ⚡)', 150000, 'energy', 100],
+        ['Vitamin tổng hợp (+45 ⚡)', 65000, 'energy', 45]
     ]]
 ];
 const shopAppointments = {
@@ -1784,7 +1876,9 @@ const shopAppointments = {
     nhat_long:     [['CANAL_MARKET', 'HỦ TIẾU', 7, 10], ['DISTRICT_1', 'ỐC & LẨU', 18, 22]],
     thao_vy:       ['BETTER_STREET', 'HIỆU SÁCH', 13, 16],
     chi_man:       ['CANAL_MARKET', 'TIỆM CÁ', 6, 10],
-    gia_bao:       [['BREEZE_AREA', 'THUÊ XE ĐẠP', 15, 18], ['DISTRICT_1', 'NEON MƯA ĐÊM', 20, 23]]
+    gia_bao:       [['BREEZE_AREA', 'THUÊ XE ĐẠP', 15, 18], ['DISTRICT_1', 'NEON MƯA ĐÊM', 20, 23]],
+    bac_si_tuan:   [['BETTER_STREET', 'BỆNH VIỆN', 7, 15], ['BETTER_STREET', "L'AMOUR", 15, 17], ['DISTRICT_1', 'NHÀ HÁT', 19, 22]],
+    y_ta_ngoc_han: [['BETTER_STREET', 'BỆNH VIỆN', 7, 15], ['BETTER_STREET', 'TIỆM HOA', 15, 17], ['DOWNTOWN', 'SAIGON CHIC', 19, 22]]
 };
 const purchasedGifts = [];
 let showShopMenu = false;
@@ -1887,7 +1981,7 @@ function buyShopItem(item) {
     else if (action === 'outfit') {
         playerConfig.outfitIndex = playerConfig.outfits.push({ name, ...value }) - 1;
         outfitPreview = null;
-    } else inventory[action] = (inventory[action] || 0) + value;
+    } else addInventory(action, value);
     showToast("Đã mua " + name + (action === 'gift' ? " · Có thể tặng khi nói chuyện với NPC." :
         action === 'repair' ? " · Đẩy xe nhanh hơn hôm nay." : ""));
 }
@@ -1949,6 +2043,21 @@ function getShopVisitorX(index, total) {
 const shopsByZone = {};
 let indoorShop = null;
 let outdoorPosition = null;
+let hospitalFloor = 0;
+let lyingOnHospitalBed = false;
+
+function switchHospitalFloor(floor) {
+    const next = Math.max(0, Math.min(2, Number(floor) || 0));
+    if (hospitalFloor === next) return;
+    hospitalFloor = next;
+    GameAudio?.playDoor();
+    const names = [
+        '🚑 Tầng Trệt: Khoa Cấp Cứu & Tiếp Tân',
+        '🩺 Tầng 1: Khoa Khám Bệnh & Truyền Nước',
+        '🌟 Tầng 2: Khoa Hồi Sức VIP & Nghỉ Dưỡng'
+    ];
+    showToast(names[hospitalFloor], 160);
+}
 
 function getShopHours(title, rental) {
     if (rental) return [5, 22];
@@ -1962,6 +2071,7 @@ function getShopHours(title, rental) {
     if (/NƯỚNG|ỐC|LẨU|BIA|NHÀ HÁT/.test(title)) return [16, 24];
     if (/BÁNH|CHỢ KÊNH|HỦ TIẾU|TIỆM CÁ|TIỆM GẠO/.test(title)) return [5, 18];
     if (/XE ĐẠP/.test(title)) return [6, 19];
+    if (/BỆNH VIỆN/.test(title)) return [0, 999];
     if (/NGÂN HÀNG|CAO ỐC|VĂN PHÒNG/.test(title)) return [8, 17];
     return [8, 20];
 }
@@ -1985,6 +2095,7 @@ function shopIsOpen(shop) {
 }
 
 function shopHoursLabel(shop) {
+    if (shop.opens === 0 && shop.closes >= 24) return '24/24';
     const format = (hour) => String(Math.floor(hour)).padStart(2, '0') + (hour % 1 ? ':30' : ':00');
     return format(shop.opens) + '–' + format(shop.closes);
 }
@@ -2009,8 +2120,14 @@ function enterShop(shop) {
     closeAllModals();
     outdoorPosition = { x: shop.x + shop.w / 2 - 18, y: shop.y + shop.h + 8 };
     indoorShop = shop;
-    player.x = 480;
-    player.y = 473;
+    if (shop.name.includes("BỆNH VIỆN")) {
+        hospitalFloor = 0;
+        player.x = 482;
+        player.y = 528;
+    } else {
+        player.x = 480;
+        player.y = 473;
+    }
     player.dir = 'up';
     nearbyInteractable = null;
     GameAudio?.playDoor();
@@ -2149,6 +2266,38 @@ function updateShopInterior() {
         return;
     }
     if (indoorShop.rental) updateShopCustomers();
+    if (indoorShop.name.includes("BỆNH VIỆN")) {
+        const hospitalColliders = [
+            { x: 340, y: 184, w: 320, h: 74 }
+        ];
+        if (hospitalFloor === 0) {
+            hospitalColliders.push(
+                { x: 118, y: 240, w: 120, h: 72 },
+                { x: 762, y: 240, w: 120, h: 72 },
+                { x: 118, y: 452, w: 150, h: 36 },
+                { x: 732, y: 452, w: 150, h: 36 }
+            );
+        } else if (hospitalFloor === 1) {
+            hospitalColliders.push(
+                { x: 118, y: 260, w: 110, h: 86 },
+                { x: 118, y: 390, w: 110, h: 86 },
+                { x: 772, y: 260, w: 110, h: 86 },
+                { x: 732, y: 446, w: 150, h: 38 }
+            );
+        } else {
+            hospitalColliders.push(
+                { x: 118, y: 248, w: 132, h: 96 },
+                { x: 750, y: 248, w: 132, h: 96 },
+                { x: 130, y: 420, w: 140, h: 52 },
+                { x: 730, y: 420, w: 140, h: 52 }
+            );
+        }
+        updatePlayerMovement(102, 898, 252, 578, hospitalColliders);
+        if (player.isMoving && lyingOnHospitalBed) lyingOnHospitalBed = false;
+        if (!isAnyModalOpen() && player.y >= 546 && player.x >= 435 && player.x <= 545 &&
+            (keys.s || keys.ArrowDown)) leaveShop();
+        return;
+    }
     const shopColliders = [
         { x: 260, y: 314, w: 48, h: 77 },
         { x: 690, y: 314, w: 48, h: 77 }
@@ -2165,8 +2314,240 @@ function updateShopInterior() {
         (keys.s || keys.ArrowDown)) leaveShop();
 }
 
+function drawHospitalInterior(shop) {
+    const floorNames = [
+        "🚑 TẦNG TRỆT: CẤP CỨU & TIẾP TÂN",
+        "🩺 TẦNG 1: KHOA KHÁM BỆNH & TRUYỀN NƯỚC",
+        "🌟 TẦNG 2: KHOA HỒI SỨC VIP & NGHỈ DƯỠNG"
+    ];
+
+    // Nền tối xung quanh & khung Bệnh Viện lớn xịn xò (840x522)
+    pRect(ctx, 0, 0, canvas.width, canvas.height, "#131b22");
+    pRect(ctx, 74, 68, 852, 534, "rgba(0,0,0,0.45)");
+    pOutlinedRect(ctx, 80, 74, 840, 522, "#2b5b73");
+
+    // Tường trên theo từng tầng
+    const wallBg = hospitalFloor === 2 ? "#f6efe2" : "#e6f2f7";
+    pRect(ctx, 86, 80, 828, 90, wallBg);
+    pRect(ctx, 86, 164, 828, 8, hospitalFloor === 2 ? "#b88a55" : "#2b7a9b");
+
+    // Cửa sổ kính lớn hai bên tường
+    for (const wx of [108, 194, 758, 844]) {
+        pOutlinedRect(ctx, wx, 92, 48, 54, "#2b5b73");
+        pRect(ctx, wx + 4, 96, 40, 46, hospitalFloor === 2 ? "#b6e3f4" : "#9ed5ea");
+        pRect(ctx, wx + 22, 96, 3, 46, "#2b5b73");
+        pRect(ctx, wx + 8, 102, 10, 14, "rgba(255,255,255,0.45)");
+    }
+
+    // Biển tên tầng trung tâm
+    pOutlinedRect(ctx, 296, 86, 408, 66, "#1b4965");
+    pOutlinedRect(ctx, 302, 92, 396, 54, "#2b7a9b");
+    ctx.textAlign = "center";
+    ctx.font = "bold 17px 'Chakra Petch', sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText("🏥 BỆNH VIỆN ĐA KHOA SÀI GÒN", 500, 114);
+    ctx.font = "bold 12.5px 'Chakra Petch', sans-serif";
+    ctx.fillStyle = "#ffe082";
+    ctx.fillText(floorNames[hospitalFloor], 500, 136);
+
+    // Sàn nhà theo tầng (Tầng 2 lát sàn gỗ cao cấp, Trệt & Tầng 1 lát đá hoa cương y tế)
+    const floorBg = hospitalFloor === 2 ? "#e8d5bc" : "#eef6f9";
+    pRect(ctx, 86, 172, 828, 418, floorBg);
+    for (let y = 172; y < 590; y += 32) {
+        pRect(ctx, 86, y, 828, 1, hospitalFloor === 2 ? "rgba(110,75,45,0.14)" : "rgba(43,91,115,0.12)");
+    }
+    for (let x = 86; x < 914; x += 40) {
+        pRect(ctx, x, 172, 1, 418, hospitalFloor === 2 ? "rgba(110,75,45,0.14)" : "rgba(43,91,115,0.12)");
+    }
+
+    // Thảm dẫn lối trung tâm
+    pOutlinedRect(ctx, 434, 272, 132, 278, hospitalFloor === 2 ? "#2e7d6b" : "#3a8fb7");
+    pRect(ctx, 442, 280, 116, 262, hospitalFloor === 2 ? "#469e8a" : "#64b5d6");
+
+    // 3 nút bấm chuyển tầng ở góc trên phải
+    const floorTabs = [
+        [0, "1. Trệt: Cấp Cứu"],
+        [1, "2. Tầng 1: Khám"],
+        [2, "3. Tầng 2: VIP"]
+    ];
+    floorTabs.forEach(([idx, label]) => {
+        const bx = 532 + idx * 124;
+        const by = 40;
+        const isSel = hospitalFloor === idx;
+        pOutlinedRect(ctx, bx, by, 118, 28, isSel ? "#f0b643" : "#d9e7ee");
+        ctx.fillStyle = PAL.OUTLINE;
+        ctx.font = "bold 11.5px 'Chakra Petch', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(label, bx + 59, by + 18);
+    });
+
+    // Thang máy & Cầu thang bộ bên góc trên phải trong sảnh
+    pOutlinedRect(ctx, 804, 176, 98, 56, "#37474f");
+    pRect(ctx, 812, 184, 38, 42, "#90a4ae");
+    pRect(ctx, 854, 184, 38, 42, "#90a4ae");
+    ctx.fillStyle = "#ffe082";
+    ctx.font = "bold 10px 'Chakra Petch', sans-serif";
+    ctx.fillText("🛗 THANG MÁY", 853, 170);
+
+    // Quầy Tiếp Tân / Điều Dưỡng trung tâm (vùng click 340..660, 184..258)
+    pRect(ctx, 344, 190, 320, 74, "rgba(0,0,0,0.18)");
+    pOutlinedRect(ctx, 340, 184, 320, 74, "#2b7a9b");
+    pRect(ctx, 344, 188, 312, 18, "#ffffff");
+    pOutlinedRect(ctx, 488, 190, 24, 14, "#ffffff");
+    pRect(ctx, 497, 192, 6, 10, "#d9383a");
+    pRect(ctx, 494, 195, 12, 4, "#d9383a");
+    pOutlinedRect(ctx, 368, 186, 32, 22, "#263238");
+    pRect(ctx, 372, 190, 24, 14, "#80deea");
+    pOutlinedRect(ctx, 600, 186, 32, 22, "#263238");
+    pRect(ctx, 604, 190, 24, 14, "#80deea");
+
+    // Bác sĩ / Y tá trực quầy
+    drawBitmapCharacter(484, 174, {
+        genderIndex: hospitalFloor === 1 ? 0 : 1,
+        look: [1.0, 1.04, hospitalFloor === 1 ? 'crop' : 'bun', '#392521', 0, 'none', 'plain', '#ffffff', '#cfd8dc'],
+        outfitIndex: 0,
+        outfits: [{ color: '#ffffff', shadow: '#cfd8dc', shorts: '#2b7a9b' }],
+        accessoryIndex: 0,
+        accessories: [{ type: 'none' }]
+    }, 'down', 0, false, 1.3);
+
+    ctx.textAlign = "center";
+    ctx.font = "bold 13.5px 'Chakra Petch', sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(
+        hospitalFloor === 0 ? "🚑 Quầy Cấp Cứu & Hồi Sức [E]" : hospitalFloor === 1 ? "🩺 Bàn Khám & Truyền Nước [E]" : "🌟 Quầy Điều Dưỡng VIP [E]",
+        500, 236
+    );
+    ctx.font = "11px 'Chakra Petch', sans-serif";
+    ctx.fillStyle = "#ffe082";
+    ctx.fillText("Click hoặc nhấn [E] để dùng dịch vụ hồi phục", 500, 252);
+
+    // Nội thất chi tiết từng tầng
+    const drawMedicalBed = (bx, by, vip = false) => {
+        pOutlinedRect(ctx, bx, by, 114, 68, vip ? "#6d4c41" : "#546e7a");
+        pRect(ctx, bx + 4, by + 4, 106, 60, "#ffffff");
+        pOutlinedRect(ctx, bx + 8, by + 12, 24, 44, "#e3f2fd");
+        pRect(ctx, bx + 36, by + 6, 72, 56, vip ? "#2e7d6b" : "#4fc3f7");
+        // Máy đo nhịp tim ECG bên cạnh giường
+        pOutlinedRect(ctx, bx + 10, by - 22, 34, 22, "#263238");
+        pRect(ctx, bx + 13, by - 19, 28, 16, "#0d2b24");
+        const pulseX = bx + 15 + ((tickCount % 22));
+        pRect(ctx, bx + 15, by - 11, 24, 2, "#2ecc71");
+        pRect(ctx, pulseX, by - 16, 2, 10, "#7effa7");
+        // Cây treo bình truyền dịch
+        pRect(ctx, bx + 98, by - 24, 4, 26, "#b0bec5");
+        pOutlinedRect(ctx, bx + 92, by - 24, 12, 14, "#b3e5fc");
+    };
+
+    if (hospitalFloor === 0) {
+        // Tầng Trệt: 2 Khoang Cấp Cứu trái/phải + Tủ thuốc + Ghế chờ
+        pOutlinedRect(ctx, 100, 200, 210, 140, "rgba(217, 56, 58, 0.12)");
+        pOutlinedRect(ctx, 690, 200, 210, 140, "rgba(217, 56, 58, 0.12)");
+        drawMedicalBed(118, 242, false);
+        drawMedicalBed(762, 242, false);
+        ctx.fillStyle = "#b71c1c";
+        ctx.font = "bold 11.5px 'Chakra Petch', sans-serif";
+        ctx.fillText("GIƯỜNG CẤP CỨU 01", 175, 330);
+        ctx.fillText("GIƯỜNG CẤP CỨU 02", 818, 330);
+
+        // Hàng ghế chờ cấp cứu dưới
+        for (const gx of [118, 732]) {
+            pOutlinedRect(ctx, gx, 452, 150, 34, "#2b7a9b");
+            for (let i = 0; i < 3; i++) pOutlinedRect(ctx, gx + 8 + i * 48, 458, 38, 22, "#80deea");
+        }
+    } else if (hospitalFloor === 1) {
+        // Tầng 1: 3 Giường Truyền Nước + Bảng đo thị lực + Ghế chờ
+        drawMedicalBed(118, 268, false);
+        drawMedicalBed(118, 396, false);
+        drawMedicalBed(772, 268, false);
+        pOutlinedRect(ctx, 732, 446, 150, 36, "#2b7a9b");
+        for (let i = 0; i < 3; i++) pOutlinedRect(ctx, 740 + i * 48, 452, 38, 24, "#80deea");
+        // Bảng thị lực treo tường
+        pOutlinedRect(ctx, 272, 88, 32, 46, "#ffffff");
+        ctx.fillStyle = "#263238";
+        ctx.font = "bold 10px monospace";
+        ctx.fillText("E", 288, 104);
+        ctx.fillText("F P", 288, 118);
+        ctx.fillText("T O Z", 288, 130);
+    } else {
+        // Tầng 2: 2 Phòng Hồi Sức VIP + Sofa + Bàn trà hoa + TV
+        pOutlinedRect(ctx, 98, 198, 224, 300, "rgba(46, 125, 107, 0.14)");
+        pOutlinedRect(ctx, 678, 198, 224, 300, "rgba(46, 125, 107, 0.14)");
+        drawMedicalBed(118, 250, true);
+        drawMedicalBed(750, 250, true);
+        // Sofa & Bàn trà VIP
+        for (const sx of [130, 730]) {
+            pOutlinedRect(ctx, sx, 422, 140, 24, "#2e7d6b");
+            pOutlinedRect(ctx, sx + 32, 454, 76, 28, "#8d6e63");
+            pRect(ctx, sx + 64, 460, 12, 12, "#f48fb1"); // Bình hoa bàn trà
+        }
+        drawTerracottaPlant(ctx, 348, 480, 1.3);
+        drawTerracottaPlant(ctx, 652, 480, 1.3);
+    }
+
+    // Khách / NPC đang trực hoặc có mặt trong bệnh viện (hỗ trợ nói chuyện & hẹn hò)
+    const visitors = getShopVisitors(shop);
+    visitors.forEach((npc, index) => {
+        if (lyingOnHospitalBed && npc.id === 'bac_si_tuan') return;
+        const x = getShopVisitorX(index, visitors.length);
+        drawBitmapCharacter(x, 401, {
+            genderIndex: npc.genderIndex, look: npc.look, outfitIndex: 0,
+            outfits: [{ color: npc.shirt, shadow: npc.shadow, shorts: npc.shorts }],
+            accessoryIndex: 0, accessories: [{ type: npc.accessory || 'none' }]
+        }, 'down', 0, false, 1.4);
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#1b4965";
+        ctx.font = "bold 12px 'Chakra Petch', sans-serif";
+        ctx.fillText(npc.name, x + 16, 396, 120);
+    });
+
+    // Nếu vừa ngất xỉu tỉnh dậy: vẽ người chơi nằm trên giường cấp cứu 01 + Bác sĩ đứng cạnh giường
+    if (lyingOnHospitalBed && hospitalFloor === 0) {
+        const doc = storyNPCs.find((n) => n.id === 'bac_si_tuan');
+        if (doc) {
+            drawBitmapCharacter(242, 256, {
+                genderIndex: doc.genderIndex, look: doc.look, outfitIndex: 0,
+                outfits: [{ color: doc.shirt, shadow: doc.shadow, shorts: doc.shorts }],
+                accessoryIndex: 0, accessories: [{ type: doc.accessory || 'none' }]
+            }, 'left', 0, false, 1.45);
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#1b4965";
+            ctx.font = "bold 11.5px 'Chakra Petch', sans-serif";
+            ctx.fillText(doc.name, 260, 248);
+        }
+        // Vẽ người chơi đang nằm nghỉ trên giường cấp cứu 01 (bx=118, by=242)
+        ctx.save();
+        ctx.translate(184, 276);
+        ctx.rotate(-Math.PI / 2);
+        drawBitmapCharacter(-18, -22, playerConfig, 'down', 0, false, 1.35);
+        ctx.restore();
+    } else {
+        // Nhân vật của người chơi đi lại bình thường
+        drawBitmapCharacter(player.x, player.y, playerConfig, player.dir, player.animFrame, player.isMoving, 1.5);
+        drawPlayerNameLabel(player.x, player.y);
+    }
+
+    // Nút Ra ngoài ở cổng chính dưới
+    pOutlinedRect(ctx, 431, 556, 138, 32, "#2b7a9b");
+    ctx.textAlign = "center";
+    ctx.font = "bold 13px 'Chakra Petch', sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText("🚪 Ra ngoài [Q]", 500, 577);
+
+    drawMinimalHUD(`${shop.name} (${hospitalFloor === 0 ? 'Trệt' : 'Tầng ' + hospitalFloor})`);
+    if (showShopMenu) drawShopMenu();
+    drawDialogueModal();
+    drawSleepSummaryModal();
+    drawToastOverlay();
+    drawScreenPopups();
+}
+
 function drawShopInterior() {
     const shop = indoorShop;
+    if (shop.name.includes("BỆNH VIỆN")) {
+        drawHospitalInterior(shop);
+        return;
+    }
     const isNight = Boolean(shop.nightlife);
     const isTheater = shop.name.includes("NHÀ HÁT");
     const isRooftop = shop.name.includes("BIA SÂN THƯỢNG");
@@ -2175,12 +2556,13 @@ function drawShopInterior() {
     const isFashion = shop.name.includes("SAIGON CHIC") || shop.name.includes("TIỆM MAY");
     const isJewelryOrShoe = shop.name.includes("TRANG SỨC") || shop.name.includes("GIÀY");
     const isBank = shop.name.includes("VIETBANK");
+    const isHospital = shop.name.includes("BỆNH VIỆN");
     const isFlorist = shop.name.includes("HOA");
     const isBookOrAntique = shop.name.includes("SÁCH") || shop.name.includes("ĐỒ CỔ");
     const isBakeryOrTea = shop.name.includes("L'AMOUR") || shop.name.includes("L’AMOUR") || shop.name.includes("TRÀ") || shop.name.includes("CHÈ");
     const isFoodOrRooftop = Boolean(shop.food || shop.name.includes("ĂN SÁNG") || shop.name.includes("CƠM") || isRooftop);
-    const isResidence = !shop.rental && !shop.menu && !shop.market && !shop.bikes && !isBank && !isTheater && !isNight && !isShowroom && !isRepair && !isFashion && !isJewelryOrShoe && !isBookOrAntique && !isBakeryOrTea && !isFoodOrRooftop && !isFlorist;
-    const accent = isNight ? "#7f4eb0" : isTheater ? "#8c1d4c" : isBank ? "#2e6b5e" : isRepair ? "#455a64" : isFoodOrRooftop ? "#a65b40" : "#537765";
+    const isResidence = !shop.rental && !shop.menu && !shop.market && !shop.bikes && !isBank && !isHospital && !isTheater && !isNight && !isShowroom && !isRepair && !isFashion && !isJewelryOrShoe && !isBookOrAntique && !isBakeryOrTea && !isFoodOrRooftop && !isFlorist;
+    const accent = isNight ? "#7f4eb0" : isTheater ? "#8c1d4c" : isHospital ? "#2b7a9b" : isBank ? "#2e6b5e" : isRepair ? "#455a64" : isFoodOrRooftop ? "#a65b40" : "#537765";
 
     // Nền tối xung quanh & khung tường phòng
     pRect(ctx, 0, 0, canvas.width, canvas.height, "#1b141b");
@@ -2188,7 +2570,7 @@ function drawShopInterior() {
     pOutlinedRect(ctx, 216, 104, 568, 435, "#69524f");
 
     // Tường trên với phào chỉ gỗ & giấy dán tường theo chủ đề
-    const wallBg = isNight ? "#2a1e38" : isRooftop ? "#1a233a" : isTheater ? "#3d1624" : isBank ? "#dce6e0" : isShowroom ? "#dfe4ea" : isRepair ? "#cfd8dc" : isBakeryOrTea ? "#f5e9d9" : "#f2dfc1";
+    const wallBg = isNight ? "#2a1e38" : isRooftop ? "#1a233a" : isTheater ? "#3d1624" : isHospital ? "#e8f4f8" : isBank ? "#dce6e0" : isShowroom ? "#dfe4ea" : isRepair ? "#cfd8dc" : isBakeryOrTea ? "#f5e9d9" : "#f2dfc1";
     pRect(ctx, 222, 110, 556, 79, wallBg);
     if (isRooftop) {
         for (const [sx, sy] of [[260,124],[310,148],[395,120],[620,130],[690,122],[745,146]]) {
@@ -2229,7 +2611,7 @@ function drawShopInterior() {
     ctx.fillText(isResidence ? "🏡 Không gian sinh hoạt" : "🕒 Giờ mở cửa: " + shopHoursLabel(shop), 500, 163);
 
     // Sàn nhà theo từng nhóm cửa hàng
-    const floorBg = isNight ? "#2c2238" : isTheater ? "#4b1f29" : isRooftop ? "#4a4e5c" : isShowroom ? "#d5dde5" : isRepair ? "#a6aeb3" : isBank ? "#dce7e2" : isBakeryOrTea ? "#d2b48c" : "#d8bc98";
+    const floorBg = isNight ? "#2c2238" : isTheater ? "#4b1f29" : isRooftop ? "#4a4e5c" : isShowroom ? "#d5dde5" : isRepair ? "#a6aeb3" : isHospital ? "#eef6f9" : isBank ? "#dce7e2" : isBakeryOrTea ? "#d2b48c" : "#d8bc98";
     pRect(ctx, 222, 189, 556, 344, floorBg);
     for (let y = 189; y < 532; y += 28) {
         pRect(ctx, 222, y, 556, 1, (isNight || isTheater || isRooftop) ? "rgba(255,255,255,0.06)" : "rgba(56,35,37,0.16)");
@@ -2733,9 +3115,47 @@ function drawShopInterior() {
         ctx.fillText(npc.name, x + 16, 398, 115);
     });
 
-    // Nhân vật của người chơi
-    drawBitmapCharacter(player.x, player.y, playerConfig, player.dir, player.animFrame, player.isMoving, 1.5);
-    drawPlayerNameLabel(player.x, player.y);
+    // Khách / NPC đang trực hoặc có mặt trong bệnh viện (hỗ trợ nói chuyện & hẹn hò)
+    const visitors = getShopVisitors(shop);
+    visitors.forEach((npc, index) => {
+        if (lyingOnHospitalBed && npc.id === 'bac_si_tuan') return;
+        const x = getShopVisitorX(index, visitors.length);
+        drawBitmapCharacter(x, 401, {
+            genderIndex: npc.genderIndex, look: npc.look, outfitIndex: 0,
+            outfits: [{ color: npc.shirt, shadow: npc.shadow, shorts: npc.shorts }],
+            accessoryIndex: 0, accessories: [{ type: npc.accessory || 'none' }]
+        }, 'down', 0, false, 1.4);
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#1b4965";
+        ctx.font = "bold 12px 'Chakra Petch', sans-serif";
+        ctx.fillText(npc.name, x + 16, 396, 120);
+    });
+
+    // Nếu vừa ngất xỉu tỉnh dậy: vẽ người chơi nằm trên giường cấp cứu 01 + Bác sĩ đứng cạnh giường
+    if (lyingOnHospitalBed && hospitalFloor === 0) {
+        const doc = storyNPCs.find((n) => n.id === 'bac_si_tuan');
+        if (doc) {
+            drawBitmapCharacter(242, 256, {
+                genderIndex: doc.genderIndex, look: doc.look, outfitIndex: 0,
+                outfits: [{ color: doc.shirt, shadow: doc.shadow, shorts: doc.shorts }],
+                accessoryIndex: 0, accessories: [{ type: doc.accessory || 'none' }]
+            }, 'left', 0, false, 1.45);
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#1b4965";
+            ctx.font = "bold 11.5px 'Chakra Petch', sans-serif";
+            ctx.fillText(doc.name, 260, 248);
+        }
+        // Vẽ người chơi đang nằm nghỉ trên giường cấp cứu 01 (bx=118, by=242)
+        ctx.save();
+        ctx.translate(184, 276);
+        ctx.rotate(-Math.PI / 2);
+        drawBitmapCharacter(-18, -22, playerConfig, 'down', 0, false, 1.35);
+        ctx.restore();
+    } else {
+        // Nhân vật của người chơi đi lại bình thường
+        drawBitmapCharacter(player.x, player.y, playerConfig, player.dir, player.animFrame, player.isMoving, 1.5);
+        drawPlayerNameLabel(player.x, player.y);
+    }
 
     // Chữ hướng dẫn trên quầy & nút Ra ngoài [Q] (giữ nguyên vùng click 431..569, 501..533)
     if (!isNight && !isResidence) {
@@ -2828,6 +3248,92 @@ function drawFreestandingBuilding(c, zid, x, y, w, h, opts = {}) {
     // Đăng ký vùng va chạm cho thân nhà (chừa phần hiên dưới để nhân vật đứng sát cửa)
     if (zid) {
         addCollider(zid, x, y - 10, w, h - 8);
+    }
+}
+
+function drawHospitalBuilding(c, zid, x, y, w, h) {
+    // Sân lát gạch y tế rộng phía trước & bãi đỗ xe cứu thương bên hông
+    pOutlinedRect(c, x - 24, y + h - 12, w + 128, 72, "#d8e2e6");
+    for (let px = x - 16; px < x + w + 92; px += 30) {
+        pRect(c, px, y + h - 2, 24, 24, "#c7d6dc");
+        pRect(c, px, y + h + 26, 24, 24, "#e6eef1");
+    }
+
+    // Bóng đổ tòa nhà bệnh viện
+    pRect(c, x + 10, y + 14, w + 8, h + 6, "rgba(28, 42, 52, 0.34)");
+
+    // Khối nhà chính 2 tầng màu trắng xanh y tế
+    drawWeatheredWall(c, x, y, w, h, "#f2f7f9", "#d4e2e8", "#ffffff");
+    pRect(c, x, y, w, 16, "#2b7a9b");
+    pRect(c, x + 4, y + 16, w - 8, 6, "#d7e8ef");
+    pRect(c, x + 6, y + 22, 8, h - 34, "#d4e2e8");
+    pRect(c, x + w - 14, y + 22, 8, h - 34, "#ffffff");
+
+    // Khối chữ thập đỏ nổi bật trên nóc sảnh chính
+    const crossBoxW = 72;
+    const crossBoxH = 44;
+    const crossX = x + Math.round((w - crossBoxW) / 2);
+    const crossY = y - 34;
+    pOutlinedRect(c, crossX, crossY, crossBoxW, crossBoxH, "#ffffff");
+    pRect(c, crossX + 4, crossY + 4, crossBoxW - 8, crossBoxH - 8, "#e6f2f6");
+    pRect(c, crossX + 30, crossY + 9, 12, 26, "#d9383a");
+    pRect(c, crossX + 23, crossY + 16, 26, 12, "#d9383a");
+
+    // Dãy cửa sổ kính 2 tầng
+    for (let wx = x + 26; wx <= x + w - 74; wx += 64) {
+        pOutlinedRect(c, wx, y + 32, 42, 34, "#2b5b73");
+        pRect(c, wx + 4, y + 36, 34, 26, "#9ed5ea");
+        pRect(c, wx + 20, y + 36, 3, 26, "#2b5b73");
+        pRect(c, wx + 8, y + 40, 8, 10, "rgba(255,255,255,0.45)");
+        if (wx < x + w / 2 - 80 || wx > x + w / 2 + 45) {
+            pOutlinedRect(c, wx, y + 120, 42, 34, "#2b5b73");
+            pRect(c, wx + 4, y + 124, 34, 26, "#9ed5ea");
+            pRect(c, wx + 20, y + 124, 3, 26, "#2b5b73");
+        }
+    }
+
+    // Mái sảnh cấp cứu & bảng hiệu bệnh viện
+    drawStripedAwning(c, x + w / 2 - 115, y + 86, 230, 20, "#2b7a9b", "#ffffff");
+    drawRentalStorefrontSign(
+        c, x + 46, y + 70, w - 92,
+        "🏥 BỆNH VIỆN ĐA KHOA SÀI GÒN",
+        "Cấp Cứu & Hồi Sức 24/24",
+        "#1f5c78", "#ffffff"
+    );
+
+    // Cửa kính tự động sảnh chính
+    const gateW = 140;
+    const gateH = 62;
+    const gateX = x + Math.round((w - gateW) / 2);
+    const gateY = y + h - gateH;
+    pOutlinedRect(c, gateX - 6, gateY - 6, gateW + 12, gateH + 6, "#2b5b73");
+    pRect(c, gateX, gateY, gateW, gateH, "#8ac6dd");
+    pRect(c, gateX + gateW / 2 - 2, gateY, 4, gateH, "#2b5b73");
+    pRect(c, gateX + 10, gateY + 10, 18, 36, "rgba(255,255,255,0.35)");
+    pRect(c, gateX + gateW / 2 + 12, gateY + 10, 18, 36, "rgba(255,255,255,0.35)");
+
+    // Chậu cây xanh hai bên sảnh
+    drawTerracottaPlant(c, gateX - 24, y + h - 4, 1.45);
+    drawTerracottaPlant(c, gateX + gateW + 24, y + h - 4, 1.45);
+
+    // Xe cứu thương đậu bên hông bệnh viện
+    const ambX = x + w + 18;
+    const ambY = y + h - 54;
+    pRect(c, ambX + 4, ambY + 42, 74, 10, "rgba(0,0,0,0.24)");
+    pOutlinedRect(c, ambX, ambY + 10, 62, 34, "#ffffff");
+    pOutlinedRect(c, ambX + 60, ambY + 18, 22, 26, "#ffffff");
+    pRect(c, ambX + 64, ambY + 21, 14, 11, "#7cc6e2");
+    pRect(c, ambX + 2, ambY + 28, 78, 4, "#d9383a");
+    pRect(c, ambX + 26, ambY + 15, 6, 12, "#d9383a");
+    pRect(c, ambX + 23, ambY + 18, 12, 6, "#d9383a");
+    pRect(c, ambX + 24, ambY + 4, 14, 6, "#3b9ad9");
+    pOutlinedRect(c, ambX + 10, ambY + 40, 12, 12, "#2c3038");
+    pOutlinedRect(c, ambX + 62, ambY + 40, 12, 12, "#2c3038");
+
+    if (zid) {
+        registerShop(zid, "🏥 BỆNH VIỆN ĐA KHOA SÀI GÒN", x, y, w, h, gateW);
+        addCollider(zid, x, y - 10, w, h - 8);
+        addCollider(zid, ambX, ambY + 8, 82, 42);
     }
 }
 
@@ -3115,10 +3621,13 @@ function buildAllZonesOpenWorld() {
             title: "🏢 MẶT BẰNG GÓC PHỐ MỚI", subTitle: "11.000.000đ / tháng"
         });
 
+        // Bệnh Viện Đa Khoa Sài Gòn (Góc dưới trái khu Phố Đắt Hơn)
+        drawHospitalBuilding(c, zid, BETTER_HOSPITAL.x, BETTER_HOSPITAL.y, BETTER_HOSPITAL.w, BETTER_HOSPITAL.h);
+
         drawShadeTree(c, 640, 360, 1.15, "#ff77a9");
         drawShadeTree(c, 1160, 360, 1.15);
-        drawShadeTree(c, 520, 940, 1.25);
-        drawParkBench(c, 490, 990);
+        drawShadeTree(c, 815, 940, 1.25);
+        drawParkBench(c, 785, 990);
     }
 
     // 3. TRUNG TÂM SẦM UẤT (DOWNTOWN)
@@ -3504,23 +4013,31 @@ for (let x = 20, i = 0; x < 1850; x += 186, i++) {
 // ============================================================================
 
 function formatGameClock(hourFloat) {
-    const clamped = Math.min(24, Math.max(0, hourFloat));
-    let h = Math.floor(clamped);
-    let m = Math.floor((clamped - h) * 60);
+    const wrapped = ((hourFloat % 24) + 24) % 24;
+    let h = Math.floor(wrapped);
+    let m = Math.floor((wrapped - h) * 60);
     // Làm tròn theo bước 10 phút giống Stardew Valley (05:00, 05:10, 05:20...)
     m = Math.floor(m / 10) * 10;
-    if (h >= 24) {
-        h = 0;
-        m = 0;
-    }
     const hh = String(h).padStart(2, '0');
     const mm = String(m).padStart(2, '0');
     let period = "SÁNG";
-    if (hourFloat >= 11.0 && hourFloat < 13.5) period = "TRƯA";
-    else if (hourFloat >= 13.5 && hourFloat < 18.0) period = "CHIỀU";
-    else if (hourFloat >= 18.0) period = "TỐI";
+    if (hourFloat >= 24.0) period = "ĐÊM";
+    else if (wrapped >= 11.0 && wrapped < 13.5) period = "TRƯA";
+    else if (wrapped >= 13.5 && wrapped < 18.0) period = "CHIỀU";
+    else if (wrapped >= 18.0) period = "TỐI";
     return hh + ":" + mm + " " + period;
 }
+
+function getNextMorningWakeHour(sleepHour = playerStats.hour) {
+    if (sleepHour < 23.5) return GAME_CONFIG.TIME.WAKE_UP_HOUR;
+    const extraLateHours = Math.max(0, sleepHour - GAME_CONFIG.TIME.SLEEP_PENALTY_LIMIT);
+    const rawWake = GAME_CONFIG.TIME.LATE_WAKE_UP_HOUR + extraLateHours;
+    // Làm tròn theo bước 10 phút và giới hạn muộn nhất là 18:00
+    const snapped = Math.round(rawWake * 6) / 6;
+    return Math.min(18.0, snapped);
+}
+
+let midnightNotifiedToday = false;
 
 function updateGameTime(deltaSeconds) {
     if (currentGameState !== GAME_STATES.PLAYING_HOME && currentGameState !== GAME_STATES.PLAYING_STREET) return;
@@ -3530,24 +4047,63 @@ function updateGameTime(deltaSeconds) {
     const hoursAdded = (deltaSeconds / realSecPerHour) * playerStats.timeSpeedMultiplier;
     playerStats.hour += hoursAdded;
 
-    // Nếu thức quá 24:00 (00:00 Đêm), nhân vật kiệt sức ngủ gục và chịu phạt dậy muộn hôm sau
-    if (playerStats.hour >= GAME_CONFIG.TIME.SLEEP_PENALTY_LIMIT) {
-        playerStats.hour = GAME_CONFIG.TIME.SLEEP_PENALTY_LIMIT;
-        dailyReport.latePenalty = true;
-        showToast("🌙 Đã 00:00 Đêm! Bạn quá mệt nên phải về nhà nghỉ ngơi ngay...", 220);
-        triggerSleepSummary(true);
+    // Qua 12h đêm vẫn tiếp tục chơi bình thường, không tự động ngủ hay tự động save
+    if (!midnightNotifiedToday && playerStats.hour >= GAME_CONFIG.TIME.SLEEP_PENALTY_LIMIT) {
+        midnightNotifiedToday = true;
+        showToast("🌙 Đã qua 00:00 Đêm! Bạn vẫn có thể chơi tiếp, nhưng ngủ càng muộn sáng mai sẽ dậy càng trễ.", 240);
     }
 }
 
 function triggerSleepSummary(isLateForced = false) {
     closeAllModals();
+    faintedInHospital = false;
     sleepForcedByMidnight = Boolean(isLateForced);
     dailyReport.latePenalty = isLateForced || (playerStats.hour >= 23.5);
     showSleepSummaryModal = true;
     GameAudio?.playSleep();
 }
 
+function triggerHospitalization() {
+    if (showSleepSummaryModal) return;
+    closeAllModals();
+    if (indoorShop) {
+        indoorShop = null;
+        outdoorPosition = null;
+    }
+    ridingBicycle = false;
+    activeVehicle = null;
+    activeBrewSpot = null;
+    if (coffeeCart.isPushed) {
+        coffeeCart.isPushed = false;
+        coffeeCart.zone = 'HOME_STREET';
+        coffeeCart.x = 1110;
+        coffeeCart.y = 382;
+    }
+
+    currentGameState = GAME_STATES.PLAYING_STREET;
+    currentZone = BETTER_HOSPITAL.zone;
+    player.x = BETTER_HOSPITAL.doorX;
+    player.y = BETTER_HOSPITAL.doorY;
+    player.dir = 'down';
+    nearbyInteractable = null;
+
+    playerStats.energy = 0;
+    playerStats.money -= HOSPITAL_FEE;
+    dailyReport.hospitalCost += HOSPITAL_FEE;
+    dailyReport.latePenalty = true;
+    faintedInHospital = true;
+    sleepForcedByMidnight = true;
+    showSleepSummaryModal = true;
+
+    addScreenPopup(110, 56, `-${HOSPITAL_FEE.toLocaleString('vi-VN')}đ`, "#e74c3c");
+    GameAudio?.playError();
+    GameAudio?.playSleep();
+    showToast("🚑 Bạn đã kiệt sức và ngất xỉu! Nhập viện tại Khu Phố Đắt Hơn (-1.000.000đ viện phí).", 280);
+}
+
 function confirmStartNextDay() {
+    const wokeAtHospital = faintedInHospital;
+    faintedInHospital = false;
     showSleepSummaryModal = false;
     sleepForcedByMidnight = false;
     GameAudio?.playWakeUp();
@@ -3597,10 +4153,16 @@ function confirmStartNextDay() {
     });
 
     let morningMsg = "";
-    if (dailyReport.latePenalty) {
-        playerStats.hour = GAME_CONFIG.TIME.LATE_WAKE_UP_HOUR; // Dậy muộn 08:00 sáng
+    const wakeHour = getNextMorningWakeHour(playerStats.hour);
+    midnightNotifiedToday = false;
+    if (wokeAtHospital) {
+        playerStats.hour = Math.max(GAME_CONFIG.TIME.LATE_WAKE_UP_HOUR, wakeHour);
+        playerStats.energy = playerStats.maxEnergy;
+        morningMsg = `🏥 Năm ${playerStats.year} • Ngày ${playerStats.dayOfYear}/100 (${wInfo.icon} ${wInfo.name}) - Xuất viện lúc ${formatGameClock(playerStats.hour)} (100% Thể lực)!`;
+    } else if (dailyReport.latePenalty) {
+        playerStats.hour = wakeHour;
         playerStats.energy = Math.round(playerStats.maxEnergy * 0.75);
-        morningMsg = `⏰ Năm ${playerStats.year} • Ngày ${playerStats.dayOfYear}/100 (${wInfo.icon} ${wInfo.name}) - Dậy muộn 08:00 (75% Thể lực)!`;
+        morningMsg = `⏰ Năm ${playerStats.year} • Ngày ${playerStats.dayOfYear}/100 (${wInfo.icon} ${wInfo.name}) - Dậy muộn lúc ${formatGameClock(playerStats.hour)} (75% Thể lực)!`;
     } else {
         playerStats.hour = GAME_CONFIG.TIME.WAKE_UP_HOUR; // Dậy đúng 05:00 sáng
         playerStats.energy = playerStats.maxEnergy;
@@ -3608,6 +4170,14 @@ function confirmStartNextDay() {
     }
 
     settleBusinesses();
+    const spoiled = processDailyIngredientSpoilage();
+    const spoiledParts = [];
+    if (spoiled.coffee) spoiledParts.push(`${spoiled.coffee} 🫘 Cà phê`);
+    if (spoiled.milk) spoiledParts.push(`${spoiled.milk} 🥫 Sữa`);
+    if (spoiled.fruit) spoiledParts.push(`${spoiled.fruit} 🍊 Cam`);
+    if (spoiledParts.length) {
+        businessNews.push(`🗑️ Hư hỏng qua đêm: ${spoiledParts.join(', ')}`);
+    }
     if(bankDebt>0){
         if(playerStats.money>=dailyLoanPayment){playerStats.money-=dailyLoanPayment;bankDebt-=dailyLoanPayment;creditScore=Math.min(100,creditScore+1);businessNews.push(`VietBank đã thu ${moneyLabel(dailyLoanPayment)} tiền góp.`);}
         else {creditScore=Math.max(0,creditScore-5);businessNews.push("Quá hạn VietBank · uy tín tín dụng giảm 5.");}
@@ -3626,20 +4196,48 @@ function confirmStartNextDay() {
         showToast(`${morningMsg}${eventTag}${cloudTag}`, dailyEvent ? 360 : 260);
     }
 
-    // Reset thống kê ngày mới và đưa người chơi về cạnh giường trong phòng ngủ
+    // Reset thống kê ngày mới và đưa người chơi về cạnh giường trong phòng ngủ (hoặc cổng bệnh viện nếu vừa nhập viện)
     dailyReport = {
         cupsSold: 0,
         revenue: 0,
         ingredientCost: 0,
         rentCost: 0,
+        hospitalCost: 0,
         latePenalty: false
     };
     dailyRegularOrders = 0;
     regularContractPaid = false;
-    currentGameState = GAME_STATES.PLAYING_HOME;
-    player.x = 301;
-    player.y = 199;
-    player.dir = 'down';
+    if (wokeAtHospital) {
+        const hospitalShop = (shopsByZone[BETTER_HOSPITAL.zone] || []).find((s) => s.name.includes("BỆNH VIỆN"));
+        currentGameState = GAME_STATES.PLAYING_STREET;
+        currentZone = BETTER_HOSPITAL.zone;
+        if (hospitalShop) {
+            indoorShop = hospitalShop;
+            hospitalFloor = 0;
+            outdoorPosition = { x: BETTER_HOSPITAL.doorX, y: BETTER_HOSPITAL.doorY };
+            lyingOnHospitalBed = true;
+            player.x = 244;
+            player.y = 324;
+            player.dir = 'left';
+            const doctorNpc = storyNPCs.find((n) => n.id === 'bac_si_tuan');
+            if (doctorNpc) {
+                doctorNpc.briefingLines = [
+                    "Anh đã làm việc quá sức, phí hồi sức là 1 triệu đồng.",
+                    "Lần sau nhớ ăn uống đầy đủ và nghỉ ngơi trước khi cạn kiệt sức lực nhé!"
+                ];
+                openNPCDialogue(doctorNpc);
+            }
+        } else {
+            player.x = BETTER_HOSPITAL.doorX;
+            player.y = BETTER_HOSPITAL.doorY;
+            player.dir = 'down';
+        }
+    } else {
+        currentGameState = GAME_STATES.PLAYING_HOME;
+        player.x = 301;
+        player.y = 199;
+        player.dir = 'down';
+    }
     if (window.GameCloud?.isLoggedIn()) {
         GameCloud.saveSlot(GameCloud.activeSlot, exportSaveData()).then((res) => {
             if (!res.ok) showToast(`⚠️ Chưa lưu được lên Cloud: ${res.error}`, 260);
@@ -3681,7 +4279,7 @@ function buyIngredientAtMarket(item) {
         showToast("🥖 Đã ăn " + item.name + "! Hồi phục +" + item.energyRestore + " ⚡ Thể lực.");
     } else {
         GameAudio?.playBuy();
-        inventory[item.id] = (inventory[item.id] || 0) + item.packAmount;
+        addInventory(item.id, item.packAmount);
         addScreenPopup(560, 56, "+" + item.packAmount + " " + item.icon + " " + item.name, "#2ecc71");
         showToast("🛒 Đã mua +" + item.packAmount + " phần [" + item.name + "] (-" + price.toLocaleString('vi-VN') + "đ)");
     }
@@ -3825,9 +4423,8 @@ function brewAndSellDrink(recipe) {
     const help = spouse && spotId === 'cart_mobile' && !Object.keys(rentedProperties).length
         ? marriageProfiles[spouse.id][1] : 0;
     const energyCost = Math.max(1, recipe.energyCost - help - (businesses[spotId]?.upgrades?.machine?1:0));
-    if (playerStats.energy < energyCost) {
-        GameAudio?.playError();
-        showToast("⚡ Bạn đã kiệt sức! Hãy ăn Bánh Mì ở chợ hoặc về Nhà ngủ nhé.");
+    if (playerStats.energy <= 0) {
+        triggerHospitalization();
         return;
     }
 
@@ -3845,10 +4442,10 @@ function brewAndSellDrink(recipe) {
 
     // Trừ nguyên liệu & thể lực, cộng thời gian pha chế (10 phút game)
     for (const [ingId, reqCount] of Object.entries(recipe.need)) {
-        inventory[ingId] -= reqCount;
+        consumeInventory(ingId, reqCount);
     }
     playerStats.energy = Math.max(0, playerStats.energy - energyCost);
-    playerStats.hour = Math.min(23.9, playerStats.hour + ((help ? 5 : 10) / 60));
+    playerStats.hour += (help ? 5 : 10) / 60;
 
     // Tính giá bán theo hệ số Khu Phố
     const zInfo = GAME_CONFIG.ZONES[currentZone];
@@ -3908,6 +4505,9 @@ function brewAndSellDrink(recipe) {
     matchedCustomer.wantedRecipeIdx = Math.floor(Math.random() * GAME_CONFIG.RECIPES.length);
 
     showToast(recipe.icon + " Đã phục vụ [" + recipe.name + "] thu về +" + finalPrice.toLocaleString('vi-VN') + "đ!", 160);
+    if (playerStats.energy <= 0) {
+        triggerHospitalization();
+    }
 }
 
 function triggerInteractable(inter) {
@@ -3929,7 +4529,13 @@ function triggerInteractable(inter) {
         }
         closeAllModals();
         showMarketModal = true;
+    } else if (inter.type === 'SEIZED_CART') {
+        redeemSeizedCoffeeCart();
     } else if (inter.type === 'BREW_SPOT') {
+        if (inter.data?.spotId === 'cart_mobile' && coffeeCart.seized) {
+            redeemSeizedCoffeeCart();
+            return;
+        }
         if (inter.data?.spotId === 'cart_mobile' && !coffeeCart.isOpen) {
             GameAudio?.playError();
             showToast("🔒 Xe Cà Phê đang đóng cửa! Nhấn [C] để mở bán lại.");
@@ -3965,6 +4571,8 @@ function triggerInteractable(inter) {
         closeAllModals();
         showTVModal = true;
         GameAudio?.playModalOpen();
+    } else if (inter.type === 'DELIVERY_NPC') {
+        deliverActiveOrder();
     } else if (inter.type === 'NPC') {
         openNPCDialogue(inter.data);
     }
@@ -4001,7 +4609,7 @@ function giftDrinkToActiveNPC(recipeIdx) {
         }
     }
     for (const [ing, amt] of Object.entries(recipe.need)) {
-        inventory[ing] -= amt;
+        consumeInventory(ing, amt);
     }
     const isLoved = (npc.lovedDrink === recipe.id);
     const isBirthday = npc.birthday === playerStats.dayOfYear;
@@ -4039,6 +4647,7 @@ function advanceDialogue() {
     } else {
         delete activeDialogueNPC.briefingLines;
         activeDialogueNPC = null;
+        if (lyingOnHospitalBed) lyingOnHospitalBed = false;
     }
 }
 
@@ -4188,24 +4797,27 @@ function generateDeliveryOffers() {
         const recipe = GAME_CONFIG.RECIPES[Math.floor(Math.random() * GAME_CONFIG.RECIPES.length)];
         const zoneKey = targetZones[Math.floor(Math.random() * targetZones.length)];
         const zone = GAME_CONFIG.ZONES[zoneKey];
+        const zoneRoster = npcRosters[zoneKey]?.length ? npcRosters[zoneKey] : storyNPCs;
+        const customerNpc = zoneRoster[Math.floor(Math.random() * zoneRoster.length)];
         const cups = 2 + Math.floor(Math.random() * 3);
         const shipBonus = 18000 + Math.floor(Math.random() * 15000);
-        const reward = Math.round((recipe.sellPrice * cups * (zone?.priceMultiplier || 1) + shipBonus) / 1000) * 1000;
-        const deadlineHour = Math.min(23, curHour + 3 + (i % 2));
-        const customerName = DELIVERY_CUSTOMERS[Math.floor(Math.random() * DELIVERY_CUSTOMERS.length)];
+        const unitPrice = recipe.baseSellPrice || 24000;
+        const reward = Math.round((unitPrice * cups * (zone?.priceMultiplier || 1) + shipBonus) / 1000) * 1000;
+        const deadlineHour = curHour + 3 + (i % 2);
         offers.push({
             id: `${playerStats.day}_${curHour}_${i}_${Math.floor(Math.random() * 999)}`,
             recipeIndex: GAME_CONFIG.RECIPES.indexOf(recipe),
             recipeName: recipe.name,
-            coffeeNeed: recipe.coffee * cups,
-            milkNeed: (recipe.milk || 0) * cups,
-            fruitNeed: (recipe.fruit || 0) * cups,
+            coffeeNeed: (recipe.need?.coffee || 0) * cups,
+            milkNeed: (recipe.need?.milk || 0) * cups,
+            fruitNeed: (recipe.need?.fruit || 0) * cups,
             cups,
             zoneKey,
             zoneName: zone ? zone.name : zoneKey,
             reward,
             deadlineHour,
-            customerName
+            customerId: customerNpc?.id || null,
+            customerName: customerNpc?.name || DELIVERY_CUSTOMERS[i % DELIVERY_CUSTOMERS.length]
         });
     }
     deliveryOffers = offers;
@@ -4245,21 +4857,27 @@ function deliverActiveOrder() {
         showToast(`⚠️ Thiếu nguyên liệu để pha ${activeDeliveryOrder.cups} ${activeDeliveryOrder.recipeName}!`);
         return;
     }
-    inventory.coffee -= activeDeliveryOrder.coffeeNeed;
-    inventory.milk -= activeDeliveryOrder.milkNeed;
-    inventory.fruit -= activeDeliveryOrder.fruitNeed;
+    consumeInventory('coffee', activeDeliveryOrder.coffeeNeed);
+    consumeInventory('milk', activeDeliveryOrder.milkNeed);
+    consumeInventory('fruit', activeDeliveryOrder.fruitNeed);
     playerStats.money += activeDeliveryOrder.reward;
     dailyReport.cupsSold += activeDeliveryOrder.cups;
     dailyReport.revenue += activeDeliveryOrder.reward;
     deliveryCompletedToday += 1;
     addCityReputation(2);
     GameAudio?.playCoin();
+    const targetNpc = storyNPCs.find((n) => n.id === activeDeliveryOrder.customerId);
+    if (targetNpc) {
+        targetNpc.friendship = (targetNpc.friendship || 0) + 5;
+        addFloatingText(targetNpc.x + 18, targetNpc.y - 24, `+${moneyLabel(activeDeliveryOrder.reward)} Cảm ơn!`, "#2ecc71");
+    }
     const doneZone = activeDeliveryOrder.zoneName;
+    const doneName = activeDeliveryOrder.customerName;
     const doneReward = activeDeliveryOrder.reward;
     activeDeliveryOrder = null;
     if (!deliveryOffers.length) generateDeliveryOffers();
     showDeliveryModal = false;
-    showToast(`✅ Đã giao đơn tại ${doneZone}! +${moneyLabel(doneReward)} (+2 Danh tiếng)`);
+    showToast(`✅ Đã giao đơn cho ${doneName} tại ${doneZone}! +${moneyLabel(doneReward)} (+2 Danh tiếng)`);
 }
 
 function checkDeliveryExpiration() {
@@ -4474,7 +5092,94 @@ function clearCartCustomers() {
     });
 }
 
+function seizeCoffeeCart(silent = false) {
+    if (coffeeCart.seized || coffeeCart.isPushed) return;
+    coffeeCart.seized = true;
+    coffeeCart.isOpen = false;
+    coffeeCart.isPushed = false;
+    if (showBrewModal && activeBrewSpot?.spotId === 'cart_mobile') showBrewModal = false;
+    clearCartCustomers();
+    marketInspector.active = true;
+    marketInspector.zone = coffeeCart.zone;
+    marketInspector.x = Math.min(WORLD_W - 60, coffeeCart.x + 98);
+    marketInspector.y = coffeeCart.y + 8;
+    marketInspector.dir = -1;
+    if (!silent) {
+        GameAudio?.playError();
+        showToast("👮 Quản Lý Thị Trường đã lập biên bản tạm giữ Xe Cà Phê! Tiền chuộc: 2.000.000đ.", 260);
+    }
+}
+
+function redeemSeizedCoffeeCart() {
+    if (!coffeeCart.seized) return;
+    if (playerStats.money < CART_BAIL_FEE) {
+        GameAudio?.playError();
+        showToast("⚠️ Không đủ 2.000.000đ để đóng phạt chuộc lại Xe Cà Phê!");
+        return;
+    }
+    playerStats.money -= CART_BAIL_FEE;
+    coffeeCart.seized = false;
+    coffeeCart.isOpen = true;
+    marketInspector.active = false;
+    marketInspector.zone = null;
+    marketInspector.patrolCooldown = 2700 + Math.floor(Math.random() * 2700);
+    addScreenPopup(110, 56, `-${CART_BAIL_FEE.toLocaleString('vi-VN')}đ`, "#e74c3c");
+    addFloatingText(coffeeCart.x + 44, coffeeCart.y - 24, "Đã chuộc xe!", "#2ecc71");
+    GameAudio?.playCoin();
+    showToast("✅ Đã đóng 2.000.000đ tiền chuộc Xe Cà Phê! Lần sau nhớ né Quản Lý Thị Trường nhé.", 240);
+}
+
+function updateMarketInspector() {
+    if (coffeeCart.seized) {
+        marketInspector.active = true;
+        marketInspector.zone = coffeeCart.zone;
+        return;
+    }
+    if (coffeeCart.isPushed || !coffeeCart.isOpen || coffeeCart.zone !== currentZone || (currentZone === 'PARK' && getTodayFestival())) {
+        if (marketInspector.active) {
+            marketInspector.active = false;
+            marketInspector.zone = null;
+            marketInspector.patrolCooldown = 2400 + Math.floor(Math.random() * 2400);
+        }
+        return;
+    }
+    if (!marketInspector.active) {
+        marketInspector.patrolCooldown -= dt;
+        if (marketInspector.patrolCooldown <= 0) {
+            const fromLeft = coffeeCart.x > WORLD_W / 2;
+            marketInspector.active = true;
+            marketInspector.zone = currentZone;
+            marketInspector.x = fromLeft ? Math.max(40, coffeeCart.x - 420) : Math.min(WORLD_W - 70, coffeeCart.x + 420);
+            marketInspector.y = coffeeCart.y + 8;
+            marketInspector.dir = fromLeft ? 1 : -1;
+        }
+        return;
+    }
+    const targetX = coffeeCart.x + 90;
+    const targetY = coffeeCart.y + 8;
+    const dx = targetX - marketInspector.x;
+    const dy = targetY - marketInspector.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 22) {
+        seizeCoffeeCart(false);
+        return;
+    }
+    const step = 1.05 * dt;
+    marketInspector.x += (dx / dist) * step;
+    marketInspector.y += (dy / dist) * step;
+    marketInspector.dir = dx >= 0 ? 1 : -1;
+    marketInspector.animTimer++;
+    if (marketInspector.animTimer >= 16) {
+        marketInspector.animFrame = (marketInspector.animFrame + 1) % 4;
+        marketInspector.animTimer = 0;
+    }
+}
+
 function toggleCoffeeCartOpen() {
+    if (coffeeCart.seized) {
+        redeemSeizedCoffeeCart();
+        return;
+    }
     if (coffeeCart.isPushed) {
         GameAudio?.playError();
         showToast("Hãy nhấn [G] đậu Xe Cà Phê xuống trước rồi mới đóng/mở bán.");
@@ -4501,6 +5206,10 @@ function toggleCoffeeCartOpen() {
 }
 
 function togglePushCoffeeCart() {
+    if (coffeeCart.seized) {
+        redeemSeizedCoffeeCart();
+        return;
+    }
     if (activeVehicle) {
         GameAudio?.playError();
         showToast("Nhấn [V] và chọn Đi bộ trước khi đẩy xe cà phê.");
@@ -4551,6 +5260,11 @@ function switchZone(targetZone, newX, newY, newDir) {
     if (newDir) player.dir = newDir;
     if (coffeeCart.isPushed) {
         coffeeCart.zone = targetZone;
+    } else if (!coffeeCart.seized && coffeeCart.zone === targetZone) {
+        const seizeChance = (targetZone !== 'HOME_STREET' || coffeeCart.isOpen) ? 0.30 : 0.10;
+        if (Math.random() < seizeChance) {
+            seizeCoffeeCart(true);
+        }
     }
     closeAllModals();
     updateCamera(true);
@@ -4781,7 +5495,26 @@ canvas.addEventListener('click', function (event) {
                 }
             } else if (showMarketModal) handleMarketModalClick(mouseX, mouseY);
             else if (showBrewModal) handleBrewModalClick(mouseX, mouseY);
-            else if (indoorShop.nightlife && indoorShop.name.includes("SKYLINE") && Math.abs(mouseX - 384) < 48 && mouseY >= 200 && mouseY <= 275) {
+            else if (indoorShop.name.includes("BỆNH VIỆN")) {
+                for (let idx = 0; idx < 3; idx++) {
+                    const bx = 532 + idx * 124;
+                    if (mouseX >= bx && mouseX <= bx + 118 && mouseY >= 40 && mouseY <= 68) {
+                        switchHospitalFloor(idx);
+                        return;
+                    }
+                }
+                if (mouseX >= 804 && mouseX <= 902 && mouseY >= 176 && mouseY <= 232) {
+                    switchHospitalFloor((hospitalFloor + 1) % 3);
+                    return;
+                }
+                if (mouseX >= 431 && mouseX <= 569 && mouseY >= 556 && mouseY <= 588) leaveShop();
+                else if (mouseX >= 340 && mouseX <= 660 && mouseY >= 184 && mouseY <= 258) useShopCounter();
+                else if (mouseY >= 389 && mouseY <= 452) {
+                    const floorVisitors = getShopVisitors(indoorShop);
+                    const visitor = floorVisitors.find((npc, index) => Math.abs(mouseX - getShopVisitorX(index, floorVisitors.length)) < 50);
+                    if (visitor) openNPCDialogue(visitor);
+                }
+            } else if (indoorShop.nightlife && indoorShop.name.includes("SKYLINE") && Math.abs(mouseX - 384) < 48 && mouseY >= 200 && mouseY <= 275) {
                 const kyDuyen = getShopVisitors(indoorShop).find((npc) => npc.id === 'ky_duyen');
                 if (kyDuyen) openNPCDialogue(kyDuyen);
             } else if (mouseY >= 389 && mouseY <= 452) {
@@ -4922,7 +5655,11 @@ canvas.addEventListener('click', function (event) {
 
             for (const npc of storyNPCs) {
                 if (npc.meeting?.zone === currentZone && !npc.meeting.shop && Math.hypot(worldClickX - (npc.x + 18), worldClickY - (npc.y + 24)) < 42) {
-                    openNPCDialogue(npc);
+                    if (activeDeliveryOrder && activeDeliveryOrder.zoneKey === currentZone && activeDeliveryOrder.customerId === npc.id) {
+                        deliverActiveOrder();
+                    } else {
+                        openNPCDialogue(npc);
+                    }
                     return;
                 }
             }
@@ -4944,7 +5681,11 @@ canvas.addEventListener('click', function (event) {
             }
             // Click vào Xe Đẩy Cà Phê di động (khi đang đậu ở khu phố hiện tại)
             if (coffeeCart.zone === currentZone && !coffeeCart.isPushed) {
-                if (worldClickX >= coffeeCart.x - 10 && worldClickX <= coffeeCart.x + 98 && worldClickY >= coffeeCart.y - 45 && worldClickY <= coffeeCart.y + 60) {
+                if (worldClickX >= coffeeCart.x - 10 && worldClickX <= coffeeCart.x + 135 && worldClickY >= coffeeCart.y - 45 && worldClickY <= coffeeCart.y + 60) {
+                    if (coffeeCart.seized) {
+                        redeemSeizedCoffeeCart();
+                        return;
+                    }
                     if (!coffeeCart.isOpen) {
                         GameAudio?.playError();
                         showToast("🔒 Xe Cà Phê đang đóng cửa! Nhấn [C] để mở bán lại.");
@@ -5309,13 +6050,17 @@ function updateStreet() {
 
     const festival = currentZone === 'PARK' ? getTodayFestival() : null;
     const festivalSelling = updateShopCustomers(festival);
+    updateMarketInspector();
 
     // Cập nhật NPC có tên trong khu vực hiện tại
     for (const homeZone of npcScheduleZones) {
         npcRosters[homeZone].forEach((npc, index) => {
             const schedule = getNPCSchedule(homeZone, index);
-            const meeting = schedule.find(({ end }) => playerStats.hour < end) ?? schedule.at(-1);
-            if (npc.meeting?.spot !== meeting.spot || npc.meeting?.zone !== meeting.zone) {
+            const isDeliveryCustomer = activeDeliveryOrder && activeDeliveryOrder.customerId === npc.id;
+            const meeting = isDeliveryCustomer
+                ? { zone: activeDeliveryOrder.zoneKey, spot: npcMeetingSpots[index % npcMeetingSpots.length], shop: null, isDeliverySpot: true }
+                : (schedule.find(({ end }) => playerStats.hour < end) ?? schedule.at(-1));
+            if (npc.meeting?.spot !== meeting.spot || npc.meeting?.zone !== meeting.zone || Boolean(npc.meeting?.isDeliverySpot) !== Boolean(meeting.isDeliverySpot)) {
                 npc.meeting = meeting;
                 npc.x = meeting.spot.label === 'Quảng trường'
                     ? meeting.spot.x : meeting.spot.x + index * 130;
@@ -5345,14 +6090,19 @@ function updateStreet() {
             type: 'PUSH_HINT',
             label: "🛒 Đang đẩy Xe Cà Phê 5AM - Nhấn [G] để đậu xe xuống bán (Công Viên rất đông khách!)"
         };
-    } else if (coffeeCart.zone === currentZone && Math.hypot((player.x + 18) - (coffeeCart.x + 44), (player.y + 24) - (coffeeCart.y + 32)) < 95) {
-        nearbyInteractable = {
-            type: 'BREW_SPOT',
-            label: coffeeCart.isOpen
-                ? "☕ Xe Đẩy Cà Phê 5AM - [E] Bán hàng  |  [C] Đóng cửa  |  [G] Đẩy xe"
-                : "🔒 Xe Cà Phê (Đã đóng cửa) - [C] Mở bán lại  |  [G] Đẩy xe đi khu khác",
-            data: { spotId: 'cart_mobile', name: "Xe Đẩy Cà Phê 5AM", zoneId: currentZone }
-        };
+    } else if (coffeeCart.zone === currentZone && Math.hypot((player.x + 18) - (coffeeCart.x + 44), (player.y + 24) - (coffeeCart.y + 32)) < 110) {
+        nearbyInteractable = coffeeCart.seized
+            ? {
+                type: 'SEIZED_CART',
+                label: "👮 Xe bị Quản Lý Thị Trường tạm giữ! Nhấn [E] hoặc Click để chuộc xe (2.000.000đ)"
+            }
+            : {
+                type: 'BREW_SPOT',
+                label: coffeeCart.isOpen
+                    ? "☕ Xe Đẩy Cà Phê 5AM - [E] Bán hàng  |  [C] Đóng cửa  |  [G] Đẩy xe"
+                    : "🔒 Xe Cà Phê (Đã đóng cửa) - [C] Mở bán lại  |  [G] Đẩy xe đi khu khác",
+                data: { spotId: 'cart_mobile', name: "Xe Đẩy Cà Phê 5AM", zoneId: currentZone }
+            };
     }
 
     if (currentZone === 'HOME_STREET') {
@@ -5407,11 +6157,18 @@ function updateStreet() {
         ];
         for (const npc of talkables) {
             if (Math.hypot((player.x + 18) - (npc.x + 18), (player.y + 24) - (npc.y + 24)) < 70) {
-                nearbyInteractable = {
-                    type: 'NPC',
-                    label: `💬 ${npc.name} - Nhấn [E] hoặc Click để trò chuyện`,
-                    data: npc
-                };
+                const isDeliveryTarget = activeDeliveryOrder && activeDeliveryOrder.zoneKey === currentZone && activeDeliveryOrder.customerId === npc.id;
+                nearbyInteractable = isDeliveryTarget
+                    ? {
+                        type: 'DELIVERY_NPC',
+                        label: `🛵 Giao ${activeDeliveryOrder.cups}x ${activeDeliveryOrder.recipeName} cho ${npc.name} · Nhấn [E] hoặc Click`,
+                        data: npc
+                    }
+                    : {
+                        type: 'NPC',
+                        label: `💬 ${npc.name} - Nhấn [E] hoặc Click để trò chuyện`,
+                        data: npc
+                    };
                 break;
             }
         }
@@ -6241,7 +6998,15 @@ function drawMarketModal() {
         ctx.fillStyle = PAL.OUTLINE;
         ctx.font = "bold 16px 'Chakra Petch', sans-serif";
         ctx.textAlign = "left";
+        const shelfLife = INGREDIENT_SHELF_LIFE[item.id];
         ctx.fillText(`${item.icon} ${item.name} (+${item.packAmount})`, 228, rowY + 25);
+        if (shelfLife) {
+            ctx.fillStyle = shelfLife === 1 ? "#c0392b" : "#8b5a2b";
+            ctx.font = "bold 12px 'Chakra Petch', sans-serif";
+            ctx.textAlign = "right";
+            ctx.fillText(`⏳ Hạn: ${shelfLife} ngày`, 620, rowY + 24);
+            ctx.textAlign = "left";
+        }
 
         ctx.fillStyle = "#4a3525";
         ctx.font = "13px 'Chakra Petch', sans-serif";
@@ -6347,9 +7112,12 @@ function drawBrewModal() {
         } else if (!isOrdered) {
             btnText = "KHÔNG GỌI";
             btnColor = "#95a5a6";
-        } else if (!hasIng || playerStats.energy < rcp.energyCost) {
+        } else if (!hasIng) {
             btnText = "THIẾU ĐỒ";
             btnColor = "#b5835a";
+        } else if (playerStats.energy < rcp.energyCost) {
+            btnText = "CẠN ⚡!";
+            btnColor = "#c84b31";
         }
 
         pOutlinedRect(ctx, mx + mw - 118, rowY + 8, 98, 36, btnColor);
@@ -6390,7 +7158,8 @@ function handleBrewModalClick(mx, my) {
 
 function drawSleepSummaryModal() {
     if (!showSleepSummaryModal) return;
-    const netProfit = dailyReport.revenue - dailyReport.ingredientCost - dailyReport.rentCost;
+    const hospitalCost = dailyReport.hospitalCost || 0;
+    const netProfit = dailyReport.revenue - dailyReport.ingredientCost - dailyReport.rentCost - hospitalCost;
 
     const chooseSlotOnSleep = needsFirstSaveSlotChoice && window.GameCloud?.isLoggedIn();
     const boxH = chooseSlotOnSleep ? 500 : 440;
@@ -6400,13 +7169,20 @@ function drawSleepSummaryModal() {
     pOutlinedRect(ctx, 210, boxY, 580, boxH, "#ecd3ab");
     pOutlinedRect(ctx, 222, boxY + 12, 556, boxH - 24, "#fff6e5");
 
-    pOutlinedRect(ctx, 222, boxY + 12, 556, 54, "#2b1d16");
-    ctx.fillStyle = "#f0b643";
+    pOutlinedRect(ctx, 222, boxY + 12, 556, 54, faintedInHospital ? "#7d2020" : "#2b1d16");
+    ctx.fillStyle = faintedInHospital ? "#ffd7d7" : "#f0b643";
     ctx.font = "bold 22px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("🌙 SỔ TAY TỔNG KẾT CUỐI NGÀY " + playerStats.day, canvas.width / 2, boxY + 47);
+    ctx.fillText(
+        faintedInHospital
+            ? "🏥 NHẬP VIỆN CẤP CỨU - TỔNG KẾT NGÀY " + playerStats.day
+            : "🌙 SỔ TAY TỔNG KẾT CUỐI NGÀY " + playerStats.day,
+        canvas.width / 2,
+        boxY + 47
+    );
 
-    const rowBase = boxY + 100;
+    const rowBase = boxY + 96;
+    const rowStep = faintedInHospital ? 30 : 36;
     ctx.textAlign = "left";
     ctx.font = "bold 16px 'Chakra Petch', sans-serif";
     ctx.fillStyle = PAL.OUTLINE;
@@ -6416,39 +7192,54 @@ function drawSleepSummaryModal() {
 
     ctx.textAlign = "left";
     ctx.fillStyle = "#27ae60";
-    ctx.fillText("💰 Tổng doanh thu bán hàng:", 265, rowBase + 36);
+    ctx.fillText("💰 Tổng doanh thu bán hàng:", 265, rowBase + rowStep);
     ctx.textAlign = "right";
-    ctx.fillText("+" + dailyReport.revenue.toLocaleString('vi-VN') + " VNĐ", 735, rowBase + 36);
+    ctx.fillText("+" + dailyReport.revenue.toLocaleString('vi-VN') + " VNĐ", 735, rowBase + rowStep);
 
     ctx.textAlign = "left";
     ctx.fillStyle = "#c0392b";
-    ctx.fillText("🛒 Chi phí mua nguyên liệu chợ:", 265, rowBase + 72);
+    ctx.fillText("🛒 Chi phí mua nguyên liệu chợ:", 265, rowBase + rowStep * 2);
     ctx.textAlign = "right";
-    ctx.fillText("-" + dailyReport.ingredientCost.toLocaleString('vi-VN') + " VNĐ", 735, rowBase + 72);
+    ctx.fillText("-" + dailyReport.ingredientCost.toLocaleString('vi-VN') + " VNĐ", 735, rowBase + rowStep * 2);
 
     ctx.textAlign = "left";
-    ctx.fillText("🏠 Chi phí đầu tư thuê mặt bằng:", 265, rowBase + 108);
+    ctx.fillText("🏠 Chi phí đầu tư thuê mặt bằng:", 265, rowBase + rowStep * 3);
     ctx.textAlign = "right";
-    ctx.fillText("-" + dailyReport.rentCost.toLocaleString('vi-VN') + " VNĐ", 735, rowBase + 108);
+    ctx.fillText("-" + dailyReport.rentCost.toLocaleString('vi-VN') + " VNĐ", 735, rowBase + rowStep * 3);
 
-    pRect(ctx, 260, rowBase + 128, 480, 3, PAL.OUTLINE);
+    let lineY = rowBase + rowStep * 3 + 20;
+    if (faintedInHospital) {
+        ctx.textAlign = "left";
+        ctx.fillStyle = "#b02a2a";
+        ctx.fillText("🏥 Viện phí cấp cứu (ngất xỉu):", 265, rowBase + rowStep * 4);
+        ctx.textAlign = "right";
+        ctx.fillText("-" + hospitalCost.toLocaleString('vi-VN') + " VNĐ", 735, rowBase + rowStep * 4);
+        lineY = rowBase + rowStep * 4 + 18;
+    }
+
+    pRect(ctx, 260, lineY, 480, 3, PAL.OUTLINE);
 
     ctx.textAlign = "left";
     ctx.font = "bold 18px 'Chakra Petch', sans-serif";
     ctx.fillStyle = netProfit >= 0 ? "#27ae60" : "#c0392b";
-    ctx.fillText("📊 LỢI NHUẬN RÒNG TRONG NGÀY:", 265, rowBase + 158);
+    ctx.fillText("📊 LỢI NHUẬN RÒNG TRONG NGÀY:", 265, lineY + 30);
     ctx.textAlign = "right";
-    ctx.fillText((netProfit >= 0 ? "+" : "") + netProfit.toLocaleString('vi-VN') + " VNĐ", 735, rowBase + 158);
+    ctx.fillText((netProfit >= 0 ? "+" : "") + netProfit.toLocaleString('vi-VN') + " VNĐ", 735, lineY + 30);
 
+    const nextWakeHour = faintedInHospital
+        ? Math.max(GAME_CONFIG.TIME.LATE_WAKE_UP_HOUR, getNextMorningWakeHour(playerStats.hour))
+        : getNextMorningWakeHour(playerStats.hour);
     ctx.textAlign = "center";
     ctx.font = "bold 13px 'Chakra Petch', sans-serif";
-    ctx.fillStyle = dailyReport.latePenalty ? "#c0392b" : "#4f8a46";
+    ctx.fillStyle = (faintedInHospital || dailyReport.latePenalty) ? "#c0392b" : "#4f8a46";
     ctx.fillText(
-        dailyReport.latePenalty
-            ? "⚠️ Bạn đi ngủ quá khuya (sau 23:30) nên sáng mai sẽ thức dậy muộn lúc 08:00!"
-            : "✨ Ngủ đúng giờ! Sáng mai bạn sẽ thức dậy lúc 05:00 Sáng với 100% Thể lực!",
+        faintedInHospital
+            ? `🚑 Kiệt sức ngất xỉu (-1.000.000đ)! Sáng mai xuất viện lúc ${formatGameClock(nextWakeHour)} (100% Thể lực).`
+            : dailyReport.latePenalty
+                ? `⚠️ Ngủ muộn (${formatGameClock(playerStats.hour)}) nên sáng mai sẽ dậy trễ lúc ${formatGameClock(nextWakeHour)}!`
+                : "✨ Ngủ đúng giờ! Sáng mai bạn sẽ thức dậy lúc 05:00 Sáng với 100% Thể lực!",
         canvas.width / 2,
-        rowBase + 194
+        lineY + 66
     );
 
     if (chooseSlotOnSleep) {
@@ -7183,8 +7974,31 @@ function drawToastOverlay() {
     }
 }
 
+function drawMarketInspectorInWorld() {
+    if (!marketInspector.active || marketInspector.zone !== currentZone) return;
+    const cfg = {
+        genderIndex: 0,
+        look: [1.14, 1.08, 'crop', '#262930', 1, 'tie', 'suit', '#2f4f6f', '#1c3247'],
+        outfitIndex: 0,
+        outfits: [{ color: '#2f4f6f', shadow: '#1c3247', shorts: '#1e2730' }],
+        accessoryIndex: 0,
+        accessories: [{ type: 'cap' }]
+    };
+    drawBitmapCharacter(marketInspector.x, marketInspector.y, cfg, marketInspector.dir > 0 ? 'right' : 'left', marketInspector.animFrame, true, 1.45);
+    ctx.font = "bold 10.5px 'Chakra Petch', sans-serif";
+    ctx.textAlign = "center";
+    const tag = "👮 QUẢN LÝ THỊ TRƯỜNG";
+    const width = ctx.measureText(tag).width + 12;
+    pOutlinedRect(ctx, marketInspector.x + 18 - width / 2, marketInspector.y - 18, width, 16, "#ffd6d6");
+    ctx.fillStyle = "#96281b";
+    ctx.fillText(tag, marketInspector.x + 18, marketInspector.y - 6);
+}
+
 function drawCoffeeCartInWorld() {
-    if (coffeeCart.zone !== currentZone) return;
+    if (coffeeCart.zone !== currentZone) {
+        drawMarketInspectorInWorld();
+        return;
+    }
     const cx = Math.round(coffeeCart.x);
     const cy = Math.round(coffeeCart.y);
 
@@ -7195,6 +8009,12 @@ function drawCoffeeCartInWorld() {
         pRect(ctx, cx + 2, cy - 32, 84, 32, "#5c4a42");
         for (let sy = cy - 26; sy < cy - 2; sy += 6) {
             pRect(ctx, cx + 4, sy, 80, 2, "#3a2e28");
+        }
+    }
+    if (coffeeCart.seized) {
+        pRect(ctx, cx - 2, cy - 10, 92, 8, "#f1c40f");
+        for (let sx = cx; sx < cx + 84; sx += 14) {
+            pRect(ctx, sx, cy - 10, 7, 8, "#c0392b");
         }
     }
     drawStripedAwning(ctx, cx - 6, cy - 50, 100, 20, "#c84b31", "#f0b643");
@@ -7212,13 +8032,16 @@ function drawCoffeeCartInWorld() {
         pOutlinedRect(ctx, cx + 92, cy + 46, 12, 10, "#2980b9");
         pOutlinedRect(ctx, cx + 110, cy + 46, 12, 10, "#c0392b");
     }
-    ctx.fillStyle = (!coffeeCart.isOpen && !coffeeCart.isPushed) ? "#6d5b53" : PAL.SIGN_RED;
+    ctx.fillStyle = coffeeCart.seized ? "#c0392b" : ((!coffeeCart.isOpen && !coffeeCart.isPushed) ? "#6d5b53" : PAL.SIGN_RED);
     ctx.font = "bold 11px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(
-        coffeeCart.isPushed ? "🛒 ĐANG ĐẨY" : (coffeeCart.isOpen ? "☕ XE CÀ PHÊ 5AM" : "🔒 ĐÃ ĐÓNG CỬA"),
+        coffeeCart.seized
+            ? "🚫 TẠM GIỮ (2TR)"
+            : (coffeeCart.isPushed ? "🛒 ĐANG ĐẨY" : (coffeeCart.isOpen ? "☕ XE CÀ PHÊ 5AM" : "🔒 ĐÃ ĐÓNG CỬA")),
         cx + 44, cy + 30
     );
+    drawMarketInspectorInWorld();
 }
 
 function drawScreenPopups() {
@@ -7515,10 +8338,20 @@ function drawStoryNPCsInWorld() {
             accessories: [{ type: npc.accessory || 'none' }]
         };
         drawBitmapCharacter(npc.x, npc.y, cfg, npc.dir > 0 ? 'right' : 'left', npc.animFrame, true, 1.45);
+        const isDeliveryTarget = activeDeliveryOrder && activeDeliveryOrder.zoneKey === currentZone && activeDeliveryOrder.customerId === npc.id;
+        if (isDeliveryTarget) {
+            const bob = Math.sin(tickCount * 0.14) * 3;
+            pOutlinedRect(ctx, npc.x + 7, npc.y - 46 + bob, 22, 24, "#e74c3c");
+            pRect(ctx, npc.x + 15, npc.y - 22 + bob, 6, 4, "#2b1d16");
+            ctx.fillStyle = "#ffe066";
+            ctx.font = "bold 17px 'Chakra Petch', sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("!", npc.x + 18, npc.y - 28 + bob);
+        }
         ctx.font = "bold 11px 'Chakra Petch', sans-serif";
         ctx.textAlign = "center";
         const width = ctx.measureText(npc.name).width + 12;
-        pOutlinedRect(ctx, npc.x + 18 - width / 2, npc.y - 16, width, 16, "#ecd3ab");
+        pOutlinedRect(ctx, npc.x + 18 - width / 2, npc.y - 16, width, 16, isDeliveryTarget ? "#ffe066" : "#ecd3ab");
         ctx.fillStyle = PAL.OUTLINE;
         ctx.fillText(npc.name, npc.x + 18, npc.y - 4);
     });
@@ -7857,6 +8690,11 @@ function exportSaveData() {
         },
         playerStats: { ...playerStats },
         inventory: { ...inventory },
+        inventoryBatches: {
+            coffee: (inventoryBatches.coffee || []).map((b) => ({ ...b })),
+            milk: (inventoryBatches.milk || []).map((b) => ({ ...b })),
+            fruit: (inventoryBatches.fruit || []).map((b) => ({ ...b }))
+        },
         dailyReport: { ...dailyReport },
         currentZone,
         inHome: currentGameState === GAME_STATES.PLAYING_HOME,
@@ -7893,6 +8731,19 @@ function applySaveData(data) {
     if (data.playerConfig) Object.assign(playerConfig, data.playerConfig);
     if (data.playerStats) Object.assign(playerStats, data.playerStats);
     if (data.inventory) Object.assign(inventory, data.inventory);
+    if (data.inventoryBatches) {
+        for (const k of ['coffee', 'milk', 'fruit']) {
+            inventoryBatches[k] = Array.isArray(data.inventoryBatches[k])
+                ? data.inventoryBatches[k].map((b) => ({ qty: Number(b.qty) || 0, daysLeft: Number(b.daysLeft) || INGREDIENT_SHELF_LIFE[k] }))
+                : [];
+        }
+        syncInventoryTotals();
+    } else if (data.inventory) {
+        for (const k of ['coffee', 'milk', 'fruit']) {
+            const qty = Math.max(0, Number(inventory[k]) || 0);
+            inventoryBatches[k] = qty > 0 ? [{ qty, daysLeft: INGREDIENT_SHELF_LIFE[k] }] : [];
+        }
+    }
     if (data.dailyReport) Object.assign(dailyReport, data.dailyReport);
     if (data.coffeeCart) Object.assign(coffeeCart, data.coffeeCart);
     if (typeof data.cityReputation === 'number') cityReputation = data.cityReputation;

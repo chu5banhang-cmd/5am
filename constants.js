@@ -886,6 +886,38 @@ const GAME_CONFIG = {
                 "Tôi đang chờ nắng lên để chụp mấy chiếc thuyền ngoài xa.",
                 "Lúc gió lớn tôi hay tìm chỗ có mái che ngồi xem lại ảnh."
             ]
+        },
+        {
+            id: "bac_si_tuan", name: "Bác Sĩ Tuấn",
+            role: "Bác sĩ Khoa Cấp Cứu - Bệnh Viện Sài Gòn",
+            romancePartnerId: 'y_ta_ngoc_han',
+            zone: 'BETTER_STREET', x: 380, y: 716, minX: 330, maxX: 430,
+            speed: 0.34, dir: 1, genderIndex: 0,
+            shirt: '#ffffff', shadow: '#cfd8dc', shorts: '#2b7a9b', accessory: 'none',
+            dialogues: [
+                "Làm việc chăm chỉ là tốt, nhưng nhớ giữ sức khỏe kẻo phải vào khoa cấp cứu của tôi đấy.",
+                "Trực ca ở Bệnh Viện Sài Gòn căng thẳng lắm, có ly cà phê sữa đá buổi sáng là tỉnh hẳn."
+            ],
+            dialoguesForFemalePlayer: [
+                "Chào bạn, hôm nay quán cà phê có đông khách không? Nhớ đừng để bản thân kiệt sức nhé.",
+                "Tan ca ở bệnh viện tôi hay ghé tiệm bánh đầu phố, khi nào rảnh mình uống cà phê cùng nhé."
+            ]
+        },
+        {
+            id: "y_ta_ngoc_han", name: "Cô Y Tá Ngọc Hân",
+            role: "Y tá Khoa Hồi Sức - Bệnh Viện Sài Gòn",
+            romancePartnerId: 'bac_si_tuan',
+            zone: 'BETTER_STREET', x: 520, y: 716, minX: 470, maxX: 570,
+            speed: 0.34, dir: -1, genderIndex: 1,
+            shirt: '#80deea', shadow: '#4fb3bf', shorts: '#2b7a9b', accessory: 'none',
+            dialogues: [
+                "Em trực ở Khoa Hồi Sức Bệnh Viện Sài Gòn, thấy nhiều người làm quá sức đến ngất xỉu thương lắm!",
+                "Anh nhớ ăn uống đầy đủ và đừng để cạn năng lượng nha, em không muốn thấy anh nằm giường cấp cứu đâu."
+            ],
+            dialoguesForFemalePlayer: [
+                "Bác sĩ Tuấn trực chung ca với mình tận tâm lắm, lúc nào cũng nhắc mọi người giữ sức khỏe.",
+                "Tan ca mình hay ghé tiệm hoa hoặc quán cà phê cho thư giãn, bữa nào đi chung nha!"
+            ]
         }
     ],
 
