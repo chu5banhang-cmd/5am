@@ -265,14 +265,35 @@ let nearbyInteractable = null; // { type: 'MARKET' | 'CART' | 'RENTED_SHOP' | 'B
 
 // Các bảng Modal tương tác (Khi mở Modal thì thời gian tự động Pause giống Stardew Valley)
 const businessTypes = [
-    { id: 'cafe', name: 'Quán cà phê', setup: 1000000, daily: 110000 },
-    { id: 'restaurant', name: 'Nhà hàng', setup: 6500000, daily: 520000 },
-    { id: 'fashion', name: 'Shop quần áo', setup: 4800000, daily: 420000 },
-    { id: 'florist', name: 'Shop hoa', setup: 2800000, daily: 260000 },
-    { id: 'bakery', name: 'Tiệm bánh', setup: 3800000, daily: 340000 },
-    { id: 'coworking', name: 'Co-working & Cà Phê Sách', setup: 8500000, daily: 700000 },
-    { id: 'lounge', name: 'Lounge / Bar Acoustic', setup: 15000000, daily: 1250000 }
+    { id: 'cafe', name: 'Quán cà phê', setup: 1000000, daily: 110000, idealRep: 10, minFactor: 0.35 },
+    { id: 'florist', name: 'Shop hoa', setup: 2800000, daily: 260000, idealRep: 20, minFactor: 0.25 },
+    { id: 'bakery', name: 'Tiệm bánh', setup: 3800000, daily: 340000, idealRep: 30, minFactor: 0.20 },
+    { id: 'fashion', name: 'Shop quần áo', setup: 4800000, daily: 420000, idealRep: 45, minFactor: 0.15 },
+    { id: 'restaurant', name: 'Nhà hàng', setup: 6500000, daily: 520000, idealRep: 60, minFactor: 0.12 },
+    { id: 'coworking', name: 'Co-working & Cà Phê Sách', setup: 8500000, daily: 700000, idealRep: 75, minFactor: 0.10 },
+    { id: 'lounge', name: 'Lounge / Bar Acoustic', setup: 15000000, daily: 1250000, idealRep: 90, minFactor: 0.08 }
 ];
+
+function getBusinessReputationFactor(type) {
+    const ideal = type?.idealRep || 10;
+    const minF = type?.minFactor ?? 0.25;
+    if (cityReputation < ideal) {
+        const ratio = Math.max(0, cityReputation / ideal);
+        return minF + (1 - minF) * Math.pow(ratio, 1.25);
+    }
+    const overRatio = (cityReputation - ideal) / Math.max(10, 100 - ideal + 10);
+    return Math.min(1.25, 1.0 + overRatio * 0.25 + (customerReputation || 0) / 1000);
+}
+
+function getBusinessRentDue(business) {
+    const share = business?.partner?.share || 0;
+    return Math.round(((business?.rental?.price || 0) * (1 - share)) / 1000) * 1000;
+}
+
+function getDaysUntilNextRent() {
+    const rem = playerStats.dayOfYear % 25;
+    return rem === 0 ? 25 : 25 - rem;
+}
 let businessDraft = null;
 const businesses = {};
 const rejectedPartners = new Set();
@@ -847,14 +868,25 @@ function ensureChapterProgress(showNotice = false) {
 function addCityReputation(amount) {
     const before = cityReputation;
     cityReputation = Math.max(0, Math.min(100, cityReputation + amount));
-    const unlocks = [
-        ['Khu Phố Đắt Hơn', 5], ['Khu Đón Gió', 8], ['Khu Người Già', 10],
-        ['Khu Văn Phòng', 12], ['Trung Tâm Sầm Uất', 16], ['Quận 1', 22]
-    ];
-    const unlocked = unlocks.filter(([, threshold]) => before < threshold && cityReputation >= threshold).pop();
-    if (unlocked) {
-        GameAudio?.playUnlock();
-        showToast(`Danh tiếng ${cityReputation}/100 · Đủ điều kiện thuê mặt bằng tại ${unlocked[0]}!`);
+    if (amount > 0) {
+        const unlocks = [
+            ['Khu Phố Đắt Hơn', 8], ['Khu Đón Gió', 15], ['Khu Người Già', 22],
+            ['Khu Văn Phòng', 30], ['Trung Tâm Sầm Uất', 45], ['Quận 1', 60]
+        ];
+        const unlocked = unlocks.filter(([, threshold]) => before < threshold && cityReputation >= threshold).pop();
+        if (unlocked) {
+            GameAudio?.playUnlock();
+            showToast(`Danh tiếng ${cityReputation}/100 · Đủ điều kiện thuê mặt bằng tại ${unlocked[0]}!`);
+        }
+    }
+}
+
+function checkNPCFriendshipMilestone(npc) {
+    if (!npc || npc.repMilestoneClaimed) return;
+    if ((npc.friendship || 0) >= 100) {
+        npc.repMilestoneClaimed = true;
+        addCityReputation(2);
+        addScreenPopup(500, 428, `🤝 Bạn thân ${npc.name}: +2 Danh tiếng!`, "#f0b643");
     }
 }
 
@@ -873,8 +905,8 @@ function recordChapterAction(action, amount = 1) {
 
 function getRentalReputationRequirement(rental, zone = currentZone) {
     const thresholds = {
-        HOME_STREET: 0, BETTER_STREET: 5, BREEZE_AREA: 8,
-        ELDERLY_AREA: 10, OFFICE_DISTRICT: 12, DOWNTOWN: 16, DISTRICT_1: 22
+        HOME_STREET: 0, BETTER_STREET: 8, BREEZE_AREA: 15,
+        ELDERLY_AREA: 22, OFFICE_DISTRICT: 30, DOWNTOWN: 45, DISTRICT_1: 60
     };
     const base = thresholds[zone] ?? 0;
     return base + (rental?.price >= 28000000 ? 3 : 0);
@@ -1994,7 +2026,7 @@ function giftShopItem() {
     const gift = purchasedGifts.shift();
     const points = gift.points * (npc.birthday === playerStats.dayOfYear ? 2 : 1);
     npc.friendship = (npc.friendship || 0) + points;
-    addCityReputation(2);
+    checkNPCFriendshipMilestone(npc);
     npc.giftedToday = true;
     recordRelationshipDay(npc);
     showToast(`🎁 ${gift.name} cho ${npc.name} · +${points} thân thiết`);
@@ -2173,36 +2205,55 @@ function drawManagementModal() {
     const business = currentBusiness();
     const upgrades = business?.upgrades || (business ? (business.upgrades = {}) : {});
     const hasStaff = Boolean(business?.hasStaff);
+    const bType = business?.type || businessTypes[0];
+    const repFactor = getBusinessReputationFactor(bType);
+    const repPct = Math.round(repFactor * 100);
+    const rentShare = business ? getBusinessRentDue(business) : (shop?.price || 0);
+    const daysLeftRent = getDaysUntilNextRent();
+    const isOverdue = Boolean(business?.rentOverdue && business?.overdueAmount > 0);
     pRect(ctx, 0, 0, canvas.width, canvas.height, "rgba(20,14,10,0.8)");
-    pOutlinedRect(ctx, 170, 82, 660, 496, "#ecd3ab");
+    pOutlinedRect(ctx, 170, 72, 660, 514, "#ecd3ab");
     ctx.textAlign = "center"; ctx.fillStyle = PAL.OUTLINE;
     ctx.font = "bold 20px 'Chakra Petch', sans-serif";
-    ctx.fillText("Quản lý cửa hàng", 500, 120);
-    ctx.font = "bold 13px 'Chakra Petch', sans-serif";
-    ctx.fillText(`Uy tín quán ${customerReputation}/100 · Danh tiếng thành phố ${cityReputation}/100 · Tín dụng ${creditScore}`, 500, 148, 620);
-    ctx.fillText(`Giá bán ${(priceOptions[dailyPriceIndex] * 100).toFixed(0)}% · Món trọng tâm ${GAME_CONFIG.RECIPES[dailyRecipeIndex].name}`, 500, 175, 610);
-    ctx.fillText(`Khách quen hôm nay: ${dailyRegularOrders}/3 · Danh tiếng cao sẽ kéo thêm khách.`, 500, 203, 610);
-    pOutlinedRect(ctx, 220, 226, 560, 40, "#fff3d6");
-    ctx.fillText(`Giá bán: ${priceOptions.map((v,i)=>`${i===dailyPriceIndex?'●':'○'} ${Math.round(v*100)}%`).join('   ')}`, 500, 251);
-    pOutlinedRect(ctx, 220, 274, 560, 40, "#fff3d6");
-    ctx.fillText(`Món trọng tâm: ${GAME_CONFIG.RECIPES[dailyRecipeIndex].name}  ◀ ▶`, 500, 299);
+    ctx.fillText(`Quản lý · ${bType.name}`, 500, 108);
+    ctx.font = "bold 12.5px 'Chakra Petch', sans-serif";
+    ctx.fillText(`Uy tín quán ${customerReputation}/100 · Danh tiếng TP ${cityReputation}/100 (Chuẩn ngành: ${bType.idealRep}) · Công suất khách: ${repPct}%`, 500, 134, 620);
+    ctx.fillStyle = isOverdue ? "#c0392b" : "#5d4037";
+    ctx.fillText(
+        isOverdue
+            ? `⚠️ ĐANG NỢ TIỀN MẶT BẰNG: ${moneyLabel(business.overdueAmount)} (Quán tạm ngừng sinh lời)`
+            : `🏠 Tiền mặt bằng định kỳ (mỗi 25 ngày): ${moneyLabel(rentShare)} · Còn ${daysLeftRent} ngày tới kỳ đóng`,
+        500, 158, 620
+    );
+    ctx.fillStyle = PAL.OUTLINE;
+    ctx.fillText(`Giá bán ${(priceOptions[dailyPriceIndex] * 100).toFixed(0)}% · Món trọng tâm ${GAME_CONFIG.RECIPES[dailyRecipeIndex].name} · Khách quen hôm nay: ${dailyRegularOrders}/3`, 500, 182, 620);
+    pOutlinedRect(ctx, 220, 200, 560, 38, "#fff3d6");
+    ctx.fillText(`Giá bán: ${priceOptions.map((v,i)=>`${i===dailyPriceIndex?'●':'○'} ${Math.round(v*100)}%`).join('   ')}`, 500, 224);
+    pOutlinedRect(ctx, 220, 246, 560, 38, "#fff3d6");
+    ctx.fillText(`Món trọng tâm: ${GAME_CONFIG.RECIPES[dailyRecipeIndex].name}  ◀ ▶`, 500, 270);
     shopUpgrades.forEach((upgrade,index) => {
-        const y=326+index*45; const owned=Boolean(upgrades[upgrade.id]);
-        pOutlinedRect(ctx,220,y,560,38,owned?'#b6d6a0':'#fff3d6');
-        ctx.fillText(`${upgrade.name} · ${owned?'Đã mua':moneyLabel(upgrade.price)} · ${upgrade.benefit}`,500,y+24,540);
+        const y=294+index*43; const owned=Boolean(upgrades[upgrade.id]);
+        pOutlinedRect(ctx,220,y,560,36,owned?'#b6d6a0':'#fff3d6');
+        ctx.fillText(`${upgrade.name} · ${owned?'Đã mua':moneyLabel(upgrade.price)} · ${upgrade.benefit}`,500,y+23,540);
     });
     const staffDesc = business?.type?.id === 'cafe' ? 'Tự bán +240k/ngày (lương 120k)' : 'Tăng +20% lãi ngày (lương 120k)';
-    pOutlinedRect(ctx, 220, 462, 560, 40, hasStaff ? '#b6d6a0' : '#fff3d6');
-    ctx.fillText(`👨‍🍳 Nhân viên đứng quầy: ${hasStaff ? 'Đang thuê (Bấm để nghỉ)' : 'Chưa thuê (Bấm để thuê)'} · ${staffDesc}`, 500, 487, 540);
-    pOutlinedRect(ctx, 420, 518, 160, 36, "#f0b643");
-    ctx.fillText("Đóng [Q]", 500, 542);
+    pOutlinedRect(ctx, 220, 426, 560, 38, hasStaff ? '#b6d6a0' : '#fff3d6');
+    ctx.fillText(`👨‍🍳 Nhân viên đứng quầy: ${hasStaff ? 'Đang thuê (Bấm để nghỉ)' : 'Chưa thuê (Bấm để thuê)'} · ${staffDesc}`, 500, 450, 540);
+    if (isOverdue) {
+        pOutlinedRect(ctx, 220, 472, 560, 38, "#f5b7b1");
+        ctx.fillStyle = "#922b21";
+        ctx.fillText(`💳 Bấm để đóng tiền mặt bằng quá hạn (${moneyLabel(business.overdueAmount)}) & Mở lại quán`, 500, 496, 540);
+        ctx.fillStyle = PAL.OUTLINE;
+    }
+    pOutlinedRect(ctx, 420, 524, 160, 36, "#f0b643");
+    ctx.fillText("Đóng [Q]", 500, 548);
 }
 
 function handleManagementClick(x,y) {
-    if (x>=420&&x<=580&&y>=518&&y<=554){closeAllModals();return;}
-    if (x>=220&&x<=780&&y>=226&&y<=266){dailyPriceIndex=(dailyPriceIndex+1)%priceOptions.length;return;}
-    if (x>=220&&x<=780&&y>=274&&y<=314){dailyRecipeIndex=(dailyRecipeIndex+1)%GAME_CONFIG.RECIPES.length;return;}
-    if (x>=220&&x<=780&&y>=462&&y<=502){
+    if (x>=420&&x<=580&&y>=524&&y<=560){closeAllModals();return;}
+    if (x>=220&&x<=780&&y>=200&&y<=238){dailyPriceIndex=(dailyPriceIndex+1)%priceOptions.length;return;}
+    if (x>=220&&x<=780&&y>=246&&y<=284){dailyRecipeIndex=(dailyRecipeIndex+1)%GAME_CONFIG.RECIPES.length;return;}
+    if (x>=220&&x<=780&&y>=426&&y<=464){
         const business=currentBusiness();
         if(!business)return;
         business.hasStaff=!business.hasStaff;
@@ -2212,8 +2263,27 @@ function handleManagementClick(x,y) {
             : "👨‍🍳 Đã cho nhân viên nghỉ việc.");
         return;
     }
-    if (y>=326&&y<461){
-        const upgrade=shopUpgrades[Math.floor((y-326)/45)]; const business=currentBusiness();
+    if (x>=220&&x<=780&&y>=472&&y<=510){
+        const business=currentBusiness();
+        if(business?.rentOverdue && business.overdueAmount > 0){
+            if(playerStats.money < business.overdueAmount){
+                GameAudio?.playError();
+                showToast(`⚠️ Chưa đủ ${moneyLabel(business.overdueAmount)} để thanh toán nợ mặt bằng.`);
+                return;
+            }
+            const paid = business.overdueAmount;
+            playerStats.money -= paid;
+            dailyReport.rentCost += paid;
+            business.rentOverdue = false;
+            business.overdueAmount = 0;
+            creditScore = Math.min(100, creditScore + 2);
+            GameAudio?.playCoin();
+            showToast(`✅ Đã thanh toán ${moneyLabel(paid)} tiền thuê mặt bằng! Quán hoạt động trở lại.`);
+            return;
+        }
+    }
+    if (y>=294&&y<423){
+        const upgrade=shopUpgrades[Math.floor((y-294)/43)]; const business=currentBusiness();
         if(!business||!upgrade)return;
         business.upgrades ??= {};
         if(business.upgrades[upgrade.id]){showToast("Mày đã có nâng cấp này.");return;}
@@ -4167,7 +4237,7 @@ function confirmStartNextDay() {
     }
     if(bankDebt>0){
         if(playerStats.money>=dailyLoanPayment){playerStats.money-=dailyLoanPayment;bankDebt-=dailyLoanPayment;creditScore=Math.min(100,creditScore+1);businessNews.push(`VietBank đã thu ${moneyLabel(dailyLoanPayment)} tiền góp.`);}
-        else {creditScore=Math.max(0,creditScore-5);businessNews.push("Quá hạn VietBank · uy tín tín dụng giảm 5.");}
+        else {creditScore=Math.max(0,creditScore-5);addCityReputation(-5);businessNews.push("Quá hạn VietBank · tín dụng -5, danh tiếng -5.");}
         if(bankDebt<=0){bankDebt=0;dailyLoanPayment=0;creditScore=Math.min(100,creditScore+5);businessNews.push("Đã tất toán khoản vay · hồ sơ tín dụng tăng.");}
     }
     if (spouse && Object.keys(rentedProperties).length) {
@@ -4327,6 +4397,8 @@ function handleFestivalClick(x, y) {
         const isGood = beat >= 0.39 && beat <= 0.61;
         festivalResult = isGood ? 60 : 25;
         festivalPartner.friendship += festivalResult;
+        checkNPCFriendshipMilestone(festivalPartner);
+        if (isGood) addCityReputation(2);
         GameAudio?.playFestivalHit(isGood);
     }
 }
@@ -4449,22 +4521,21 @@ function brewAndSellDrink(recipe) {
     const finalPrice = grossPrice + regularBonus + spouseCafeBonus + cartSeatingTip - Math.round(grossPrice * partnerShare);
 
     playerStats.money += finalPrice;
-    addCityReputation(1);
     recordChapterAction('sales');
     dailyReport.cupsSold += 1;
     dailyReport.revenue += finalPrice;
     if (matchedCustomer.isRegularOrder) {
         matchedCustomer.isRegularOrder = false;
         dailyRegularOrders += 1;
-        addCityReputation(1);
         recordChapterAction('regulars');
         if (dailyRegularOrders >= 3 && !regularContractPaid) {
             const reward = 250000;
             playerStats.money += reward;
             dailyReport.revenue += reward;
             customerReputation = Math.min(100, customerReputation + 4);
+            addCityReputation(1);
             regularContractPaid = true;
-            showToast(`Khách quen đủ 3/3 đơn · thưởng hợp đồng ${moneyLabel(reward)}!`);
+            showToast(`Khách quen đủ 3/3 đơn · thưởng hợp đồng ${moneyLabel(reward)} & +1 Danh tiếng!`);
         }
     }
     const satisfaction=priceOptions[dailyPriceIndex] > 1.1 ? -1 : 1;
@@ -4575,7 +4646,7 @@ function openNPCDialogue(npc) {
         npc.talkedToday = true;
         recordRelationshipDay(npc);
         npc.friendship = (npc.friendship || 0) + 20;
-        addCityReputation(1);
+        checkNPCFriendshipMilestone(npc);
         recordChapterAction('talks');
         addScreenPopup(295, 458, "+20 ❤️ Thân thiết", "#e84393");
     }
@@ -4602,7 +4673,7 @@ function giftDrinkToActiveNPC(recipeIdx) {
     const isBirthday = npc.birthday === playerStats.dayOfYear;
     const pts = (isLoved ? 50 : 30) * (isBirthday ? 2 : 1);
     npc.friendship = (npc.friendship || 0) + pts;
-    addCityReputation(2);
+    checkNPCFriendshipMilestone(npc);
     npc.giftedToday = true;
     recordRelationshipDay(npc);
     addScreenPopup(520, 458, `+${pts} ❤️ (${recipe.name})`, isLoved ? "#e84393" : "#2ecc71");
@@ -4707,6 +4778,11 @@ function completeBusinessRental(rental, type, partner) {
 function settleBusinesses() {
     const news = [];
     let income = 0;
+    const isRentDueDay = playerStats.day > 1 && (playerStats.dayOfYear % 25 === 0);
+    const isRentWarnDay = (playerStats.dayOfYear % 25 === 22);
+    let upcomingRentTotal = 0;
+    let paidRentTotal = 0;
+
     for (const [id, business] of Object.entries(businesses)) {
         if (business.pending) {
             const { partner, quote } = business;
@@ -4731,16 +4807,60 @@ function settleBusinesses() {
             addCityReputation(2);
             recordChapterAction('rental');
             news.push(`Đã mở ${business.type.name} cùng ${partner.npc.name}.`);
-        } else if (playerStats.day >= business.opensDay && (business.type.daily || business.hasStaff)) {
+            continue;
+        }
+
+        // Tự động thu nợ mặt bằng tồn đọng nếu người chơi đã gom đủ tiền
+        if (business.rentOverdue && business.overdueAmount > 0 && playerStats.money >= business.overdueAmount) {
+            const paid = business.overdueAmount;
+            playerStats.money -= paid;
+            dailyReport.rentCost += paid;
+            business.rentOverdue = false;
+            business.overdueAmount = 0;
+            news.push(`Đã tất toán nợ thuê ${business.rental.name} (-${moneyLabel(paid)}), quán mở lại!`);
+        }
+
+        // Thu tiền thuê mặt bằng định kỳ mỗi 25 ngày (bỏ qua nếu quán vừa mở chưa đầy 5 ngày)
+        const activeDays = playerStats.day - (business.opensDay || 1);
+        const rentDue = getBusinessRentDue(business);
+        if (isRentWarnDay && activeDays >= 2) {
+            upcomingRentTotal += rentDue;
+        }
+        if (isRentDueDay && activeDays >= 5) {
+            if (playerStats.money >= rentDue) {
+                playerStats.money -= rentDue;
+                dailyReport.rentCost += rentDue;
+                paidRentTotal += rentDue;
+                creditScore = Math.min(100, creditScore + 1);
+            } else {
+                business.rentOverdue = true;
+                business.overdueAmount = (business.overdueAmount || 0) + rentDue;
+                creditScore = Math.max(0, creditScore - 5);
+                addCityReputation(-5);
+                news.push(`⚠️ Trễ tiền thuê ${business.rental.name} (${moneyLabel(business.overdueAmount)})! Quán tạm đóng & -5 Danh tiếng.`);
+            }
+        }
+
+        if (business.rentOverdue) continue;
+
+        if (playerStats.day >= business.opensDay && (business.type.daily || business.hasStaff)) {
             const share = business.partner?.share || 0;
             const zone = GAME_CONFIG.ZONES[business.zone];
             const spouseBonus = spouse ? 1.1 : 1;
             const baseDaily = business.type.daily || (business.hasStaff ? 240000 : 0);
+            const repFactor = getBusinessReputationFactor(business.type);
             const staffMult = business.hasStaff && business.type.daily ? 1.2 : 1;
             const staffSalary = business.hasStaff ? 120000 : 0;
-            const net = Math.round(baseDaily * zone.priceMultiplier * (1 - share) * spouseBonus * staffMult / 1000) * 1000 - staffSalary;
+            const grossShare = Math.round(baseDaily * repFactor * zone.priceMultiplier * (1 - share) * spouseBonus * staffMult / 1000) * 1000;
+            const net = grossShare - staffSalary;
             income += Math.max(0, net);
         }
+    }
+    if (paidRentTotal > 0) {
+        news.push(`🏠 Đã đóng tiền mặt bằng định kỳ (25 ngày): -${moneyLabel(paidRentTotal)}.`);
+    }
+    if (upcomingRentTotal > 0) {
+        news.push(`📅 Còn 3 ngày tới kỳ đóng tiền thuê mặt bằng (Tổng: ${moneyLabel(upcomingRentTotal)})!`);
     }
     playerStats.money += income;
     if (income) news.push("Lãi cửa hàng: +" + moneyLabel(income) + ".");
@@ -4851,11 +4971,13 @@ function deliverActiveOrder() {
     dailyReport.cupsSold += activeDeliveryOrder.cups;
     dailyReport.revenue += activeDeliveryOrder.reward;
     deliveryCompletedToday += 1;
-    addCityReputation(2);
+    const earnedRepToday = deliveryCompletedToday === 1;
+    if (earnedRepToday) addCityReputation(1);
     GameAudio?.playCoin();
     const targetNpc = storyNPCs.find((n) => n.id === activeDeliveryOrder.customerId);
     if (targetNpc) {
         targetNpc.friendship = (targetNpc.friendship || 0) + 5;
+        checkNPCFriendshipMilestone(targetNpc);
         addFloatingText(targetNpc.x + 18, targetNpc.y - 24, `+${moneyLabel(activeDeliveryOrder.reward)} Cảm ơn!`, "#2ecc71");
     }
     const doneZone = activeDeliveryOrder.zoneName;
@@ -4864,7 +4986,7 @@ function deliverActiveOrder() {
     activeDeliveryOrder = null;
     if (!deliveryOffers.length) generateDeliveryOffers();
     showDeliveryModal = false;
-    showToast(`✅ Đã giao đơn cho ${doneName} tại ${doneZone}! +${moneyLabel(doneReward)} (+2 Danh tiếng)`);
+    showToast(`✅ Đã giao đơn cho ${doneName} tại ${doneZone}! +${moneyLabel(doneReward)}${earnedRepToday ? ' (+1 Danh tiếng đơn đầu ngày)' : ''}`);
 }
 
 function checkDeliveryExpiration() {
@@ -4899,7 +5021,8 @@ function drawDeliveryModal() {
         ctx.font = "bold 15px 'Chakra Petch', sans-serif";
         ctx.fillText(`${o.cups}x ${o.recipeName}  →  ${o.zoneName}`, 500, 232);
         ctx.font = "13px 'Chakra Petch', sans-serif";
-        ctx.fillText(`Thưởng: ${moneyLabel(o.reward)} (+2 Danh tiếng) · Hạn chót: ${o.deadlineHour}:00`, 500, 260);
+        const repHint = deliveryCompletedToday === 0 ? "(+1 Danh tiếng đơn đầu ngày)" : "(Đã nhận Danh tiếng ship hôm nay)";
+        ctx.fillText(`Thưởng: ${moneyLabel(o.reward)} ${repHint} · Hạn chót: ${o.deadlineHour}:00`, 500, 260);
         ctx.fillStyle = hasIng ? "#2f6b2f" : "#a83232";
         ctx.fillText(
             `Nguyên liệu: ☕${o.coffeeNeed}  🥛${o.milkNeed}  🍊${o.fruitNeed} (${hasIng ? 'Đủ nguyên liệu' : 'Thiếu nguyên liệu'})`,
@@ -5044,7 +5167,7 @@ function drawBusinessDraft(rental) {
     ctx.font = "bold 21px 'Chakra Petch', sans-serif";
     ctx.fillText(rental.name, 500, 153, 650);
     ctx.font = "bold 14px 'Chakra Petch', sans-serif";
-    ctx.fillText("Giá thuê " + moneyLabel(rental.price), 500, 181);
+    ctx.fillText(`Giá thuê định kỳ (25 ngày): ${moneyLabel(rental.price)} · Danh tiếng hiện có: ${cityReputation}/100`, 500, 181);
     pOutlinedRect(ctx, 715, 484, 120, 39, "#f4d0a5");
     ctx.fillStyle = PAL.OUTLINE;
     ctx.fillText("Đóng [Q]", 775, 509);
@@ -5052,12 +5175,17 @@ function drawBusinessDraft(rental) {
         ctx.fillText("Đã đặt cọc. Kết quả hoặc số tiền còn thiếu sẽ báo vào sáng hôm sau.", 500, 250, 640);
         return;
     }
+    const repPct = Math.round(getBusinessReputationFactor(type) * 100);
     pOutlinedRect(ctx, 230, 231, 540, 41, "#fff3d6");
     pOutlinedRect(ctx, 230, 302, 540, 41, "#fff3d6");
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.fillText(`◀   ${type.name} · Vốn mở ${moneyLabel(type.setup)}   ▶`, 500, 257);
-    ctx.fillText(type.daily ? "Thu lãi tự động mỗi sáng; đối tác hưởng theo tỷ lệ góp vốn." :
-        "Tự pha và bán tại quầy. Đối tác nhận phần doanh thu theo tỷ lệ góp.", 500, 289);
+    ctx.fillText(`◀   ${type.name} · Vốn mở ${moneyLabel(type.setup)} · Chuẩn danh tiếng ${type.idealRep}   ▶`, 500, 257, 520);
+    ctx.fillStyle = cityReputation < type.idealRep ? "#b85d19" : "#2e7d32";
+    ctx.fillText(
+        `Công suất khách hiện tại: ${repPct}% (Lãi chuẩn ~${moneyLabel(Math.round(type.daily * getBusinessReputationFactor(type) / 1000) * 1000)}/ngày × Khu)`,
+        500, 289, 640
+    );
+    ctx.fillStyle = PAL.OUTLINE;
     ctx.fillText(`◀   ${offer ? offer.npc.name + " · Góp " + Math.round(offer.share * 100) + "%" : "Tự bỏ vốn"}   ▶  (${draft.offerIndex + 1}/${draft.offers.length})`, 500, 328, 510);
     ctx.fillText(offer ? `${offer.paperwork} · Rủi ro mất cọc ${Math.round(offer.risk * 100)}% · Bấm để thẩm định (50.000đ)` :
         "Kết bạn để mở thêm đề nghị hùn vốn.", 500, 365, 640);
@@ -5092,8 +5220,9 @@ function seizeCoffeeCart(silent = false) {
     marketInspector.y = coffeeCart.y + 8;
     marketInspector.dir = -1;
     if (!silent) {
+        addCityReputation(-3);
         GameAudio?.playError();
-        showToast("👮 Quản Lý Thị Trường đã lập biên bản tạm giữ Xe Cà Phê! Tiền chuộc: 2.000.000đ.", 260);
+        showToast("👮 Quản Lý Thị Trường đã lập biên bản tạm giữ Xe Cà Phê! Tiền chuộc: 2.000.000đ (-3 Danh tiếng).", 260);
     }
 }
 
@@ -5886,7 +6015,7 @@ function updateShopCustomers(festival = null) {
         activeSpots.push({ spotId: 'cart_mobile', x: coffeeCart.x + 26, y: coffeeCart.y + 52 });
     }
     (GAME_CONFIG.RENTALS[currentZone] || []).forEach((r) => {
-        if (rentedProperties[r.id] && (!businesses[r.id] || businesses[r.id].type.id === 'cafe') && playerStats.hour < 22) {
+        if (rentedProperties[r.id] && !businesses[r.id]?.rentOverdue && (!businesses[r.id] || businesses[r.id].type.id === 'cafe') && playerStats.hour < 22) {
             activeSpots.push({ spotId: r.id, x: r.doorX - 18, y: r.doorY + 10 });
         }
     });
@@ -7294,11 +7423,18 @@ function drawRentalBadgesInWorld() {
         const badgeY = r.doorY - 46;
 
         if (isRented) {
-            pOutlinedRect(ctx, badgeX - 10, badgeY, badgeW + 20, 28, "#2ecc71");
-            ctx.fillStyle = "#143821";
+            const biz = businesses[r.id];
+            const overdue = Boolean(biz?.rentOverdue);
+            pOutlinedRect(ctx, badgeX - 10, badgeY, badgeW + 20, 28, overdue ? "#e74c3c" : "#2ecc71");
+            ctx.fillStyle = overdue ? "#ffffff" : "#143821";
             ctx.font = "bold 12px 'Chakra Petch', sans-serif";
             ctx.textAlign = "center";
-            ctx.fillText((businesses[r.id]?.type.name || "Quán cà phê").toUpperCase() + " · " + playerConfig.name, r.doorX, badgeY + 18, badgeW + 12);
+            ctx.fillText(
+                overdue
+                    ? `⚠️ NỢ THUÊ · ${(biz?.type.name || "Quán").toUpperCase()}`
+                    : (biz?.type.name || "Quán cà phê").toUpperCase() + " · " + playerConfig.name,
+                r.doorX, badgeY + 18, badgeW + 12
+            );
         } else {
             const pulse = Math.sin(tickCount * 0.08) * 2.5;
             pOutlinedRect(ctx, badgeX, badgeY + pulse, badgeW, 26, "#fff3d6");
@@ -7401,7 +7537,7 @@ function drawRentalModal() {
 
     ctx.font = "bold 16px 'Chakra Petch', sans-serif";
     ctx.fillStyle = "#c84b31";
-    ctx.fillText("💰 Giá thuê: " + r.price.toLocaleString('vi-VN') + " VNĐ / tháng", 260, 255);
+    ctx.fillText("💰 Giá thuê định kỳ (25 ngày): " + r.price.toLocaleString('vi-VN') + " VNĐ", 260, 255);
 
     ctx.fillStyle = PAL.OUTLINE;
     ctx.font = "bold 14px 'Chakra Petch', sans-serif";
@@ -8654,7 +8790,9 @@ function exportSaveData() {
             pending: Boolean(b.pending),
             opensDay: b.opensDay,
             upgrades: b.upgrades || {},
-            hasStaff: Boolean(b.hasStaff)
+            hasStaff: Boolean(b.hasStaff),
+            rentOverdue: Boolean(b.rentOverdue),
+            overdueAmount: b.overdueAmount || 0
         };
     }
     const npcStates = {};
@@ -8663,7 +8801,8 @@ function exportSaveData() {
             friendship: n.friendship || 0,
             talkedToday: Boolean(n.talkedToday),
             giftedToday: Boolean(n.giftedToday),
-            relationshipDays: n.relationshipDays || 0
+            relationshipDays: n.relationshipDays || 0,
+            repMilestoneClaimed: Boolean(n.repMilestoneClaimed)
         };
     });
     return {
@@ -8760,7 +8899,9 @@ function applySaveData(data) {
                     pending: Boolean(b.pending),
                     opensDay: b.opensDay || 1,
                     upgrades: b.upgrades || {},
-                    hasStaff: Boolean(b.hasStaff)
+                    hasStaff: Boolean(b.hasStaff),
+                    rentOverdue: Boolean(b.rentOverdue),
+                    overdueAmount: Number(b.overdueAmount) || 0
                 };
             }
         }
