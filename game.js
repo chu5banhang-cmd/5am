@@ -12,6 +12,26 @@ const PAL = GAME_CONFIG.PALETTE;
 const GAME_STATES = GAME_CONFIG.STATES;
 
 let currentGameState = GAME_STATES.WELCOME;
+// Năm 2: lộ trình xe khách và hàng đặc sản của người chơi.
+const yearTwo = {
+    introSeen: false,
+    showTrailer: false,
+    backpack: false,
+    travel: null,
+    province: null,
+    destination: 'DALAT',
+    stocks: { flowers: 0, strawberries: 0, arabica: 0, coconut: 0, seafood: 0, silk: 0, oysters: 0, seaSalt: 0 },
+    bag: { flowers: 0, strawberries: 0, arabica: 0, coconut: 0, seafood: 0, silk: 0, oysters: 0, seaSalt: 0 }
+};
+const busRoutes = [
+    { id: 'DALAT', name: 'Đà Lạt', zone: 'DALAT_NIGHT' },
+    { id: 'MEKONG', name: 'Miền Tây', zone: 'MEKONG_QUAY' },
+    { id: 'VUNGTAU', name: 'Vũng Tàu', zone: 'VUNGTAU_BAI_SAU' }
+];
+const parkedBus = { x: 1638, y: 1036, w: 154, h: 50 };
+let showBusRoutes = false;
+let busScene = null;
+
 let showSettingsModal = false;
 let showHandbookModal = false;
 let handbookTab = 'guide';
@@ -404,14 +424,15 @@ let keys = {
 };
 
 function isAnyModalOpen() {
-    return !!(showTVModal || showHandbookModal || showDeliveryModal || showManagementModal || showBankModal || showGarage || showShopMenu || showFestivalPanel || showWallCalendar || showNPCSchedule || showMapModal || selectedRentalModal || showMarketModal || showBrewModal || showSleepSummaryModal || activeDialogueNPC);
+    return !!(showBusRoutes || busScene || yearTwo.showTrailer || showTVModal || showHandbookModal || showDeliveryModal || showManagementModal || showBankModal || showGarage || showShopMenu || showFestivalPanel || showWallCalendar || showNPCSchedule || showMapModal || selectedRentalModal || showMarketModal || showBrewModal || showSleepSummaryModal || activeDialogueNPC);
 }
 
 function isTimePausedModalOpen() {
-    return !!(showTVModal || showHandbookModal || showDeliveryModal || showManagementModal || showBankModal || showGarage || showShopMenu || showFestivalPanel || showWallCalendar || showNPCSchedule || showMapModal || selectedRentalModal || showMarketModal || showSleepSummaryModal || activeDialogueNPC);
+    return !!(showBusRoutes || busScene || yearTwo.showTrailer || showTVModal || showHandbookModal || showDeliveryModal || showManagementModal || showBankModal || showGarage || showShopMenu || showFestivalPanel || showWallCalendar || showNPCSchedule || showMapModal || selectedRentalModal || showMarketModal || showSleepSummaryModal || activeDialogueNPC);
 }
 
 function closeAllModals() {
+    showBusRoutes = false;
     showTVModal = false;
     showHandbookModal = false;
     showDeliveryModal = false;
@@ -449,8 +470,15 @@ window.addEventListener('keydown', function (e) {
         finishIntro();
         return;
     }
+    if (yearTwo.showTrailer && (e.key === 'Enter' || e.key === 'Escape' || e.key.toLowerCase() === 'e')) { yearTwo.showTrailer = false; return; }
     if ((document.activeElement === nameInput || document.activeElement === birthdayInput || !document.getElementById('authModal')?.hidden)) return;
     const low = e.key.toLowerCase();
+    if (busScene) return;
+    if (showBusRoutes) {
+        if (low === 'q' || low === 'escape') showBusRoutes = false;
+        if (!e.repeat && /^[1-3]$/.test(low)) departByBus(busRoutes[Number(low) - 1]);
+        return;
+    }
     if (!isAnyModalOpen()) {
         if (e.key in keys) keys[e.key] = true;
         if (low in keys) keys[low] = true;
@@ -3951,6 +3979,86 @@ function drawVilla(c, x, y, width, name, color) {
 }
 
 buildHomeBackground();
+// Ba khu Đà Lạt dùng lại cùng kích thước bản đồ, camera và hệ va chạm hiện có.
+for (const [zid, colors] of [
+    ['DALAT_NIGHT', ['#5f7658', '#4b6148', '#cbbba5', '#62585b']],
+    ['DALAT_GREENHOUSE', ['#75945e', '#5c7d4d', '#d8ccb3', '#665c55']],
+    ['DALAT_PINE', ['#526e52', '#405c43', '#b6b5a2', '#555859']],
+    ['MEKONG_QUAY', ['#6da486', '#578c70', '#c9c5ac', '#57686a']],
+    ['MEKONG_FLOATING', ['#78a77e', '#5f9168', '#d0c6a6', '#52686a']],
+    ['MEKONG_CRAFT', ['#72986e', '#5c805a', '#c9bea3', '#5b6260']],
+    ['VUNGTAU_BAI_SAU', ['#7ba8a4', '#638f8b', '#d8c5a7', '#53686e']],
+    ['VUNGTAU_FISHING', ['#6b9d9b', '#568583', '#d4c5a6', '#4a6268']],
+    ['VUNGTAU_LIGHTHOUSE', ['#789f9e', '#5e8588', '#d6c5a7', '#52676e']]
+]) {
+    const c = zoneCanvases[zid].getContext('2d');
+    drawOpenWorldBase(c, zid, ...colors);
+}
+{
+    const c = zoneCanvases.DALAT_GREENHOUSE.getContext('2d');
+    for (const x of [230, 670, 1110, 1550]) {
+        pOutlinedRect(c, x, 210, 300, 180, '#b8d4ce');
+        pRect(c, x + 10, 224, 280, 150, 'rgba(177, 218, 191, 0.42)');
+        for (let row = 0; row < 3; row++) {
+            pRect(c, x + 22, 270 + row * 30, 256, 5, '#55774b');
+            for (let i = 0; i < 8; i++) pRect(c, x + 30 + i * 32, 255 + row * 30, 9, 16, '#d76778');
+        }
+    }
+    pOutlinedRect(c, 900, 850, 230, 100, '#846f4a');
+}
+{
+    const c = zoneCanvases.DALAT_PINE.getContext('2d');
+    for (let x = 90; x < 1900; x += 230) drawShadeTree(c, x, 190 + (x % 3) * 80, 1.8);
+    drawFreestandingBuilding(c, 'DALAT_PINE', 820, 760, 310, 190, { title: 'BIỆT THỰ ĐỒI THÔNG', wallCol: '#d6c8a8' });
+}
+{
+    const c = zoneCanvases.MEKONG_QUAY.getContext('2d');
+    pRect(c, 0, 1110, WORLD_W, 290, '#4c8990');
+    for (let x = 0; x < WORLD_W; x += 90) pRect(c, x, 1140 + (x % 4) * 12, 62, 3, '#82b8ac');
+    drawFreestandingBuilding(c, 'MEKONG_QUAY', 720, 250, 360, 210, { title: 'MẶT BẰNG BẾN NINH KIỀU', wallCol: '#d8c59a' });
+}
+{
+    const c = zoneCanvases.MEKONG_FLOATING.getContext('2d');
+    pRect(c, 0, 1110, WORLD_W, 290, '#4c8990');
+    for (const [x, y] of [[730, 900], [1000, 900], [1270, 900]]) {
+        pOutlinedRect(c, x - 56, y - 35, 112, 54, '#79583d');
+        pRect(c, x - 45, y - 26, 90, 38, '#d59c51');
+        pRect(c, x - 23, y - 62, 46, 27, '#b75843');
+    }
+    pOutlinedRect(c, 900, 850, 230, 100, '#846f4a');
+}
+{
+    const c = zoneCanvases.MEKONG_CRAFT.getContext('2d');
+    drawFreestandingBuilding(c, 'MEKONG_CRAFT', 820, 760, 330, 195, { title: 'LÀNG NGHỀ DỆT LỤA', wallCol: '#d4b993' });
+    for (let x = 560; x < 1450; x += 180) {
+        pOutlinedRect(c, x, 470, 115, 86, '#684e42');
+        for (let i = 0; i < 5; i++) pRect(c, x + 18 + i * 17, 482, 8, 58, ['#ba6470', '#71907d', '#d8b45d'][i % 3]);
+    }
+}
+{
+    const c = zoneCanvases.VUNGTAU_BAI_SAU.getContext('2d');
+    pRect(c, 0, 1100, WORLD_W, 300, '#4d9ca8');
+    for (let x = 0; x < WORLD_W; x += 105) pRect(c, x, 1140 + (x % 4) * 14, 72, 3, '#9bd1ca');
+    drawFreestandingBuilding(c, 'VUNGTAU_BAI_SAU', 690, 245, 360, 220, { title: 'PHỐ BIỂN BÃI SAU', wallCol: '#e0c49c' });
+}
+{
+    const c = zoneCanvases.VUNGTAU_FISHING.getContext('2d');
+    pRect(c, 0, 1110, WORLD_W, 290, '#4d9ca8');
+    for (let x = 220; x < 1780; x += 300) {
+        pOutlinedRect(c, x, 770, 180, 84, '#77573d');
+        pRect(c, x + 18, 785, 144, 52, '#d8aa61');
+        pOutlinedRect(c, x + 54, 744, 70, 34, '#b85743');
+    }
+}
+{
+    const c = zoneCanvases.VUNGTAU_LIGHTHOUSE.getContext('2d');
+    for (let x = 150; x < 1800; x += 260) drawTerracottaPlant(c, x, 500 + (x % 3) * 50, 1.2);
+    pOutlinedRect(c, 936, 500, 158, 300, '#ead8ad');
+    pRect(c, 962, 530, 106, 80, '#f3e7c7');
+    pRect(c, 992, 612, 46, 164, '#d8c399');
+    pOutlinedRect(c, 920, 478, 190, 34, '#c84b31');
+    pRect(c, 978, 538, 68, 38, '#9ed1d1');
+}
 for (const zid of ['VILLAS', 'CANAL_MARKET']) {
     const c = zoneCanvases[zid].getContext('2d');
     const villas = zid === 'VILLAS';
@@ -4104,6 +4212,12 @@ function updateGameTime(deltaSeconds) {
     const hoursAdded = (deltaSeconds / realSecPerHour) * playerStats.timeSpeedMultiplier;
     playerStats.hour += hoursAdded;
 
+    if (yearTwo.travel === 'outbound' && playerStats.hour >= 18) {
+        playerStats.hour = 18;
+        startBusScene('Về bến xe Sài Gòn', '18:00 → 19:00', arriveByBus);
+        return;
+    }
+
     // Qua 12h đêm vẫn tiếp tục chơi bình thường, không tự động ngủ hay tự động save
     if (!midnightNotifiedToday && playerStats.hour >= GAME_CONFIG.TIME.SLEEP_PENALTY_LIMIT) {
         midnightNotifiedToday = true;
@@ -4189,6 +4303,10 @@ function confirmStartNextDay() {
         playerStats.dayOfYear = 1;
         playerStats.year += 1;
         yearFestivals = rollYearFestivals();
+        if (playerStats.year === 2 && !yearTwo.introSeen) {
+            yearTwo.introSeen = true;
+            yearTwo.showTrailer = true;
+        }
     }
     ensureChapterProgress(true);
 
@@ -4568,9 +4686,71 @@ function brewAndSellDrink(recipe) {
     }
 }
 
+function startBusScene(title, schedule, onArrival) {
+    if (indoorShop) leaveShop();
+    closeAllModals();
+    resetAllMovementKeys();
+    busScene = { title, schedule, onArrival, started: performance.now() };
+}
+
+function departByBus(route) {
+    if (playerStats.hour > 9 || playerStats.money < 200000) {
+        showBusRoutes = false;
+        showToast(playerStats.hour > 9 ? 'Đã lỡ chuyến 09:00. Hẹn sáng mai!' : 'Vé khứ hồi giá 200.000đ.');
+        return;
+    }
+    playerStats.money -= 200000;
+    playerStats.hour = 9;
+    activeVehicle = null;
+    yearTwo.destination = route.id;
+    startBusScene('Đi ' + route.name, '09:00 → 10:00', () => {
+        yearTwo.travel = 'outbound';
+        yearTwo.province = route.id;
+        playerStats.hour = 10;
+        switchZone(route.zone, 960, 900, 'down');
+        showToast('Chuyến về rời tỉnh lúc 18:00.', 300);
+    });
+}
+
+function arriveByBus() {
+    playerStats.hour = 19;
+    yearTwo.travel = null;
+    yearTwo.province = null;
+    switchZone('HOME_STREET', 1710, 1105, 'up');
+    let unpacked = 0;
+    for (const [item, count] of Object.entries(yearTwo.bag)) {
+        yearTwo.stocks[item] = (yearTwo.stocks[item] || 0) + count;
+        yearTwo.bag[item] = 0;
+        unpacked += count;
+    }
+    showToast('Đã về bến xe Sài Gòn lúc 19:00.' +
+        (unpacked ? ' Đã nhập kho ' + unpacked + ' đơn vị đặc sản.' : ''), 300);
+}
+
 function triggerInteractable(inter) {
     if (!inter) return;
-    if (inter.type === 'BED') {
+    if (inter.type === 'BUS') {
+        if (playerStats.year < 2) {
+            showToast('Bến xe liên tỉnh mở cửa từ Năm 2.');
+            return;
+        }
+        resetAllMovementKeys();
+        showBusRoutes = true;
+    } else if (inter.type === 'BACKPACK') {
+        if (playerStats.dayOfYear < 75) { showToast('Ba lô đi tỉnh sẽ mở bán ở Cô Ba vào ngày 75.'); return; }
+        if (yearTwo.backpack) { showToast('Ba lô đã mua · sức chứa 8 bó hoa.'); return; }
+        if (playerStats.money < 250000) { showToast('Ba lô giá 250.000đ. Chưa đủ tiền.'); return; }
+        playerStats.money -= 250000;
+        yearTwo.backpack = true;
+        showToast('🎒 Đã mua ba lô · có thể mang tối đa 8 bó hoa Đà Lạt.');
+    } else if (inter.type === 'SPECIALTY') {
+        if (!yearTwo.backpack) { showToast('Cần ba lô để gom đặc sản. Mở bán ở Cô Ba từ ngày 75.'); return; }
+        const used = Object.values(yearTwo.bag).reduce((sum, count) => sum + count, 0);
+        if (used >= 8) { showToast('Ba lô đã đầy · tối đa 8 đơn vị hàng.'); return; }
+        const amount = Math.min(2, 8 - used);
+        yearTwo.bag[inter.item] = (yearTwo.bag[inter.item] || 0) + amount;
+        showToast(`${inter.icon} Gom ${amount} ${inter.name} · ba lô ${used + amount}/8.`);
+    } else if (inter.type === 'BED') {
         triggerSleepSummary(false);
     } else if (inter.type === 'PC') {
         const wNext = getWeatherInfo(playerStats.tomorrowWeather);
@@ -4847,7 +5027,22 @@ function settleBusinesses() {
             const share = business.partner?.share || 0;
             const zone = GAME_CONFIG.ZONES[business.zone];
             const spouseBonus = spouse ? 1.1 : 1;
-            const baseDaily = business.type.daily || (business.hasStaff ? 240000 : 0);
+            let baseDaily = business.type.daily || (business.hasStaff ? 240000 : 0);
+            const specialtyOptions = {
+                florist: [['flowers', 290000, 'hoa Đà Lạt']],
+                bakery: [['strawberries', 310000, 'dâu Đà Lạt']],
+                cafe: [['coconut', 180000, 'dừa miền Tây'], ['seaSalt', 200000, 'muối biển Vũng Tàu']],
+                restaurant: [['seafood', 450000, 'hải sản'], ['oysters', 600000, 'hàu biển Vũng Tàu']],
+                fashion: [['silk', 430000, 'lụa miền Tây']],
+                lounge: [['strawberries', 250000, 'trái cây Đà Lạt'], ['oysters', 300000, 'hàu biển Vũng Tàu']],
+                coworking: [['arabica', 220000, 'Arabica Đà Lạt']]
+            }[business.type.id] || [];
+            const specialtyUse = specialtyOptions.find(([item]) => yearTwo.stocks[item] > 0);
+            if (specialtyUse && yearTwo.stocks[specialtyUse[0]] > 0) {
+                baseDaily += specialtyUse[1];
+                yearTwo.stocks[specialtyUse[0]] -= 1;
+                news.push(`Đặc sản ${specialtyUse[2]} đã hỗ trợ ${business.type.name} (+${moneyLabel(specialtyUse[1])} thu cơ sở).`);
+            }
             const repFactor = getBusinessReputationFactor(business.type);
             const staffMult = business.hasStaff && business.type.daily ? 1.2 : 1;
             const staffSalary = business.hasStaff ? 120000 : 0;
@@ -5401,6 +5596,23 @@ canvas.addEventListener('click', function (event) {
     const scaleY = canvas.height / rect.height;
     const mouseX = (event.clientX - rect.left) * scaleX;
     const mouseY = (event.clientY - rect.top) * scaleY;
+
+    if (busScene || yearTwo.showTrailer) return;
+    if (showBusRoutes) {
+        if (mouseX >= 735 && mouseX <= 780 && mouseY >= 142 && mouseY <= 184) showBusRoutes = false;
+        const route = busRoutes.find((_, index) =>
+            mouseX >= 240 && mouseX <= 760 && mouseY >= 244 + index * 67 && mouseY <= 297 + index * 67);
+        if (route) departByBus(route);
+        return;
+    }
+    if (currentGameState === GAME_STATES.PLAYING_STREET && currentZone === 'HOME_STREET' && !indoorShop && !isAnyModalOpen()) {
+        const x = mouseX + Math.round(camera.x);
+        const y = mouseY + Math.round(camera.y);
+        if (x >= parkedBus.x && x <= parkedBus.x + parkedBus.w && y >= parkedBus.y && y <= parkedBus.y + parkedBus.h) {
+            triggerInteractable({ type: 'BUS' });
+            return;
+        }
+    }
 
     if (currentGameState === GAME_STATES.WELCOME) {
         GameAudio?.playClick();
@@ -6131,6 +6343,13 @@ function updateStreet() {
     updatePlayerMovement(16, WORLD_W - 16, 40, WORLD_H - 40, colliders);
     updateCamera(false);
 
+    if (currentZone === 'HOME_STREET' && Math.hypot(player.x - 1710, player.y - 1030) < 100) {
+        nearbyInteractable = { type: 'BUS', label: '🚌 Bến xe liên tỉnh · [E] Đi Đà Lạt · Vé 200.000đ' };
+    }
+    if (currentZone === 'HOME_STREET' && Math.hypot(player.x - 900, player.y - 900) < 70 && playerStats.dayOfYear >= 75 && !yearTwo.backpack) {
+        nearbyInteractable = { type: 'BACKPACK', label: '🎒 Ba lô Cô Ba · [E] Mua 250.000đ' };
+    }
+
     // Cập nhật xe máy chạy trên trục đường ngang 2000px
     streetMotorbikes.forEach((b) => {
         b.x += b.speed * dt;
@@ -6264,6 +6483,27 @@ function updateStreet() {
         nearbyInteractable = { type: 'WEDDING', label: `💍 Lễ cưới với ${engagedNPC.name} · [E] Cử hành` };
     }
 
+    if (!nearbyInteractable && currentZone === 'HOME_STREET' && Math.hypot(player.x - 1710, player.y - 1030) < 100) {
+        nearbyInteractable = { type: 'BUS', label: 'Bấm vào xe khách hoặc nhấn [E] để chọn tuyến' };
+    }
+    if (!nearbyInteractable && currentZone === 'HOME_STREET' && Math.hypot(player.x - 900, player.y - 900) < 70 && playerStats.dayOfYear >= 75 && !yearTwo.backpack) {
+        nearbyInteractable = { type: 'BACKPACK', label: '🎒 Ba lô Cô Ba · [E] Mua 250.000đ' };
+    }
+    if (!nearbyInteractable) {
+        const pickup = [
+            { zone: 'DALAT_GREENHOUSE', x: 1015, y: 900, item: 'flowers', name: 'hoa tươi Đà Lạt', icon: '🌷' },
+            { zone: 'DALAT_GREENHOUSE', x: 760, y: 520, item: 'strawberries', name: 'dâu tây Đà Lạt', icon: '🍓' },
+            { zone: 'DALAT_GREENHOUSE', x: 1260, y: 520, item: 'arabica', name: 'Arabica Đà Lạt', icon: '☕' },
+            { zone: 'MEKONG_FLOATING', x: 1015, y: 900, item: 'seafood', name: 'hải sản sông', icon: '🦐' },
+            { zone: 'MEKONG_FLOATING', x: 760, y: 520, item: 'coconut', name: 'dừa miền Tây', icon: '🥥' },
+            { zone: 'MEKONG_CRAFT', x: 1015, y: 900, item: 'silk', name: 'lụa miền Tây', icon: '🧵' },
+            { zone: 'VUNGTAU_FISHING', x: 1015, y: 900, item: 'oysters', name: 'hàu biển Vũng Tàu', icon: '🦪' },
+            { zone: 'VUNGTAU_FISHING', x: 760, y: 520, item: 'seafood', name: 'hải sản biển', icon: '🦐' },
+            { zone: 'VUNGTAU_LIGHTHOUSE', x: 1015, y: 900, item: 'seaSalt', name: 'muối biển', icon: '🧂' }
+        ].find((spot) => spot.zone === currentZone && Math.hypot(player.x - spot.x, player.y - spot.y) < 110);
+        if (pickup) nearbyInteractable = { type: 'SPECIALTY', item: pickup.item, name: pickup.name, icon: pickup.icon, label: `${pickup.icon} ${pickup.name} · [E] Gom tối đa 2` };
+    }
+
     // Kiểm tra đứng gần bất kỳ nhân vật nào (NPC có tên, khách đi dạo, cô hàng rong) để mở Hộp thoại
     if (!nearbyInteractable) {
         const talkables = [
@@ -6312,6 +6552,87 @@ function updateStreet() {
 // ============================================================================
 // CÁC HÀM VẼ GIAO DIỆN, ÁNH SÁNG NGÀY/ĐÊM & BẢNG TƯƠNG TÁC
 // ============================================================================
+
+function drawPassengerBus(x, y, scale) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    pOutlinedRect(ctx, 0, 0, 154, 43, '#e8b954');
+    pRect(ctx, 5, 26, 144, 10, '#a54036');
+    for (let windowX = 9; windowX <= 118; windowX += 27) {
+        pOutlinedRect(ctx, windowX, 6, 23, 18, '#608a99');
+    }
+    pRect(ctx, 145, 27, 6, 5, '#fff2bb');
+    for (const wheelX of [22, 120]) {
+        pOutlinedRect(ctx, wheelX, 34, 16, 16, '#35292a');
+        pRect(ctx, wheelX + 5, 39, 6, 6, '#aba095');
+    }
+    ctx.restore();
+}
+
+function drawBusRouteMenu() {
+    pRect(ctx, 0, 0, canvas.width, canvas.height, 'rgba(20,14,10,0.75)');
+    pOutlinedRect(ctx, 216, 140, 568, 332, '#ecd3ab');
+    ctx.textAlign = 'center';
+    ctx.fillStyle = PAL.OUTLINE;
+    ctx.font = "bold 24px 'Chakra Petch', sans-serif";
+    ctx.fillText('Chọn tuyến xe khách', 500, 184);
+    ctx.font = "bold 14px 'Chakra Petch', sans-serif";
+    ctx.fillText('09:00 đi · 18:00 về · Vé khứ hồi 200.000đ', 500, 218);
+    ctx.fillText('✕', 757, 167);
+    busRoutes.forEach((route, index) => {
+        const y = 244 + index * 67;
+        pOutlinedRect(ctx, 240, y, 520, 53, '#f7d794');
+        ctx.fillStyle = PAL.OUTLINE;
+        ctx.fillText((index + 1) + ' · ' + route.name, 500, y + 32);
+    });
+}
+
+function drawBusScene(progress) {
+    const offset = Math.round(progress * 1400);
+    pRect(ctx, 0, 0, 1000, 650, '#96b4ae');
+    pRect(ctx, 0, 320, 1000, 330, '#729168');
+    for (let i = 0; i < 10; i++) {
+        const x = i * 140 - (offset % 140);
+        pRect(ctx, x, 280 - (i % 3) * 20, 104, 90, '#58745b');
+        pRect(ctx, x + 44, 342, 16, 55, '#785546');
+    }
+    pRect(ctx, 0, 408, 1000, 122, '#504b51');
+    for (let x = -(offset % 120); x < 1000; x += 120) pRect(ctx, x, 465, 63, 4, '#d7b776');
+    drawPassengerBus(-260 + progress * 1280, 375, 1.65);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = PAL.OUTLINE;
+    ctx.font = "bold 32px 'Chakra Petch', sans-serif";
+    ctx.fillText(busScene.title, 500, 134);
+    ctx.font = "bold 19px 'Chakra Petch', sans-serif";
+    ctx.fillText(busScene.schedule, 500, 174);
+}
+
+function drawYearTwoTrailer() {
+    const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    sky.addColorStop(0, '#25364a');
+    sky.addColorStop(0.58, '#a46e64');
+    sky.addColorStop(1, '#ead2a6');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < 9; i++) {
+        const x = 40 + i * 118;
+        pRect(ctx, x, 345 - (i % 3) * 32, 96, 185 + (i % 3) * 32, '#334c46');
+        pRect(ctx, x + 18, 370 - (i % 3) * 32, 10, 12, '#f0b643');
+    }
+    pOutlinedRect(ctx, 130, 380, 740, 125, '#d5bd92');
+    pOutlinedRect(ctx, 160, 340, 680, 56, '#b94d3b');
+    ctx.fillStyle = '#fff1ce'; ctx.textAlign = 'center';
+    ctx.font = "bold 25px 'Chakra Petch', sans-serif";
+    ctx.fillText('BẾN XE LIÊN TỈNH 5AM', 500, 376);
+    pOutlinedRect(ctx, 286, 436, 428, 58, '#f0b643');
+    ctx.fillStyle = '#30242a'; ctx.font = "bold 22px 'Chakra Petch', sans-serif";
+    ctx.fillText('NĂM 2 · CHUYẾN ĐÀ LẠT ĐẦU TIÊN', 500, 474);
+    ctx.fillStyle = '#fff3d6'; ctx.font = "bold 16px 'Chakra Petch', sans-serif";
+    ctx.fillText('09:00 khởi hành · 10:00 tới nơi · 18:00 lên chuyến về', 500, 550);
+    ctx.font = "bold 14px 'Chakra Petch', sans-serif";
+    ctx.fillText('Nhấn Enter / E để bắt đầu ngày mới', 500, 595);
+}
 
 function drawWelcome() {
     const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
@@ -8273,6 +8594,21 @@ function drawStreet() {
     ctx.translate(-Math.round(camera.x), -Math.round(camera.y));
 
     ctx.drawImage(bg, 0, 0);
+    if (currentZone === 'HOME_STREET') {
+        pOutlinedRect(ctx, 1640, 970, 150, 105, '#d8c4a2');
+        pOutlinedRect(ctx, 1652, 982, 126, 26, '#c84b31');
+        ctx.fillStyle = '#fff3d6'; ctx.textAlign = 'center'; ctx.font = "bold 14px 'Chakra Petch', sans-serif";
+        ctx.fillText('BẾN XE 5AM', 1715, 1001);
+        drawPassengerBus(parkedBus.x, parkedBus.y, 1);
+    }
+    if (['DALAT_GREENHOUSE', 'MEKONG_FLOATING', 'MEKONG_CRAFT'].includes(currentZone)) {
+        const title = currentZone === 'DALAT_GREENHOUSE' ? 'VƯỜN ĐẶC SẢN ĐÀ LẠT' : currentZone === 'MEKONG_FLOATING' ? 'CHỢ NỔI MIỆT VƯỜN' : currentZone === 'MEKONG_CRAFT' ? 'SẠP LỤA THỦ CÔNG' : currentZone === 'VUNGTAU_FISHING' ? 'CHỢ CÁ VŨNG TÀU' : 'HẢI ĐĂNG VŨNG TÀU';
+        pOutlinedRect(ctx, 900, 850, 230, 100, '#846f4a');
+        ctx.fillStyle = '#fff3d6'; ctx.textAlign = 'center'; ctx.font = "bold 14px 'Chakra Petch', sans-serif";
+        ctx.fillText(title, 1015, 890);
+        const used = Object.values(yearTwo.bag).reduce((sum, count) => sum + count, 0);
+        ctx.fillText(`BA LÔ ${used}/8`, 1015, 920);
+    }
     if (festival) {
         pOutlinedRect(ctx, festivalPlaza.x - 106, festivalPlaza.y - 27, 212, 54, "#f0b643");
         pOutlinedRect(ctx, festivalStall.x - 96, festivalStall.y - 28, 192, 56, "#aaca8c");
@@ -8704,7 +9040,22 @@ function gameLoop(now = performance.now()) {
     updateGameTime(elapsedMs / 1000);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (currentGameState === GAME_STATES.WELCOME) {
+    if (busScene) {
+        const progress = Math.min(1, Math.max(0, (now - busScene.started) / 2800));
+        drawBusScene(progress);
+        if (progress === 1) {
+            const { onArrival } = busScene;
+            busScene = null;
+            onArrival();
+        }
+        requestAnimationFrame(gameLoop);
+        return;
+    }
+
+    if (yearTwo.showTrailer) {
+        if (playerFormFields) playerFormFields.style.display = 'none';
+        drawYearTwoTrailer();
+    } else if (currentGameState === GAME_STATES.WELCOME) {
         if (playerFormFields) playerFormFields.style.display = 'none';
         drawWelcome();
     } else if (currentGameState === GAME_STATES.MENU) {
@@ -8723,7 +9074,10 @@ function gameLoop(now = performance.now()) {
         drawHome();
     } else if (currentGameState === GAME_STATES.PLAYING_STREET) {
         if (playerFormFields) playerFormFields.style.display = 'none';
-        if (indoorShop) {
+        if (showBusRoutes) {
+            drawStreet();
+            drawBusRouteMenu();
+        } else if (indoorShop) {
             updateShopInterior();
             if (indoorShop) drawShopInterior();
             else drawStreet();
@@ -8807,6 +9161,7 @@ function exportSaveData() {
     });
     return {
         v: 1,
+        yearTwo: { ...yearTwo, showTrailer: false, bag: { ...yearTwo.bag } },
         playerConfig: {
             name: playerConfig.name,
             birthday: playerConfig.birthday,
@@ -8854,6 +9209,12 @@ function exportSaveData() {
 
 function applySaveData(data) {
     if (!data || typeof data !== 'object') return false;
+    if (data.yearTwo) {
+        Object.assign(yearTwo, data.yearTwo);
+        yearTwo.showTrailer = false;
+        yearTwo.bag = { flowers: 0, strawberries: 0, arabica: 0, coconut: 0, seafood: 0, silk: 0, oysters: 0, seaSalt: 0, ...(data.yearTwo.bag || {}) };
+        yearTwo.stocks = { flowers: 0, strawberries: 0, arabica: 0, coconut: 0, seafood: 0, silk: 0, oysters: 0, seaSalt: 0, ...(data.yearTwo.stocks || {}) };
+    }
     if (data.playerConfig) Object.assign(playerConfig, data.playerConfig);
     if (data.playerStats) Object.assign(playerStats, data.playerStats);
     if (data.inventory) Object.assign(inventory, data.inventory);
@@ -9008,5 +9369,14 @@ function applySaveData(data) {
         GameCloud.loadGame();
     }
 })();
+
+if (YEAR_TWO_PREVIEW) {
+    playerStats.day = GAME_CONFIG.TIME.DAYS_PER_YEAR;
+    playerStats.dayOfYear = GAME_CONFIG.TIME.DAYS_PER_YEAR;
+    yearTwo.backpack = true;
+    confirmStartNextDay();
+    currentGameState = GAME_STATES.PLAYING_STREET;
+    switchZone('HOME_STREET', 1710, 1105, 'up');
+}
 
 requestAnimationFrame(gameLoop);

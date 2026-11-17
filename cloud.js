@@ -1,5 +1,6 @@
 // cloud.js - Hệ thống Tài khoản & Lưu/Tải Cloud Database qua Supabase
 (function () {
+    if (YEAR_TWO_PREVIEW) return;
     const SUPABASE_URL = 'https://nirzeodvrldnudfstzki.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_rp_J9VZb-ugXDPZGCRP4aQ_B0GeZDF7';
     const STORAGE_KEY = '5am.cloudSession';

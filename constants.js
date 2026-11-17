@@ -1,4 +1,9 @@
 // constants.js - Cấu hình cốt lõi & Bảng màu Pixel Art Sài Gòn Hoài Cổ (5AM)
+const YEAR_TWO_PREVIEW = (
+    location.protocol === 'file:' ||
+    ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+) && new URLSearchParams(location.search).get('preview') === 'year2';
+
 const GAME_CONFIG = {
     TITLE: "5AM",
     SUBTITLE: "Khởi Nghiệp Cà Phê Hẻm Sài Gòn",
@@ -238,7 +243,16 @@ const GAME_CONFIG = {
             connections: { up: 'PARK', left: 'DISTRICT_1' },
             priceRange: '14 Triệu/tháng',
             priceMultiplier: 1.5
-        }
+        },
+        DALAT_NIGHT: { id: 'DALAT_NIGHT', name: 'Đà Lạt · Chợ Đêm & Phố Dốc', subtitle: 'Bến xe · Mặt bằng · Thương lái', connections: { right: 'DALAT_GREENHOUSE', up: 'DALAT_PINE' }, priceMultiplier: 1.35 },
+        DALAT_GREENHOUSE: { id: 'DALAT_GREENHOUSE', name: 'Đà Lạt · Thung Lũng Nhà Kính', subtitle: 'Vùng nguyên liệu · Hoa tươi', connections: { left: 'DALAT_NIGHT', up: 'DALAT_PINE' }, priceMultiplier: 1.25 },
+        DALAT_PINE: { id: 'DALAT_PINE', name: 'Đà Lạt · Đồi Thông & Biệt Thự Cổ', subtitle: 'Lễ hội mùa hoa · Nghệ sĩ · Hợp đồng', connections: { down: 'DALAT_NIGHT' }, priceMultiplier: 1.5 },
+        MEKONG_QUAY: { id: 'MEKONG_QUAY', name: 'Miền Tây · Bến Ninh Kiều', subtitle: 'Bến xe · Mặt bằng ven sông', connections: { right: 'MEKONG_FLOATING', up: 'MEKONG_CRAFT' }, priceMultiplier: 1.4 },
+        MEKONG_FLOATING: { id: 'MEKONG_FLOATING', name: 'Miền Tây · Chợ Nổi & Miệt Vườn', subtitle: 'Hải sản sông · Dừa · Trái cây', connections: { left: 'MEKONG_QUAY', up: 'MEKONG_CRAFT' }, priceMultiplier: 1.3 },
+        MEKONG_CRAFT: { id: 'MEKONG_CRAFT', name: 'Miền Tây · Làng Nghề', subtitle: 'Vải lụa · Thổ cẩm', connections: { down: 'MEKONG_QUAY' }, priceMultiplier: 1.25 },
+        VUNGTAU_BAI_SAU: { id: 'VUNGTAU_BAI_SAU', name: 'Vũng Tàu · Bãi Sau & Phố Biển', subtitle: 'Bến xe · Mặt bằng · Khách du lịch', connections: { right: 'VUNGTAU_FISHING', up: 'VUNGTAU_LIGHTHOUSE' }, priceMultiplier: 1.45 },
+        VUNGTAU_FISHING: { id: 'VUNGTAU_FISHING', name: 'Vũng Tàu · Chợ Cá & Làng Chài', subtitle: 'Hải sản biển · Hàu tươi', connections: { left: 'VUNGTAU_BAI_SAU', up: 'VUNGTAU_LIGHTHOUSE' }, priceMultiplier: 1.3 },
+        VUNGTAU_LIGHTHOUSE: { id: 'VUNGTAU_LIGHTHOUSE', name: 'Vũng Tàu · Hải Đăng & Mũi Nghinh Phong', subtitle: 'Muối biển · Cảnh quan · Hợp đồng du lịch', connections: { down: 'VUNGTAU_BAI_SAU' }, priceMultiplier: 1.4 }
     },
 
     // Danh sách mặt bằng cho thuê tại từng khu vực (tọa độ thoáng đãng trên bản đồ 2000x1400 kiểu Stardew Valley)
