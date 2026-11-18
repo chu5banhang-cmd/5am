@@ -28,7 +28,15 @@ const busRoutes = [
     { id: 'MEKONG', name: 'Miền Tây', zone: 'MEKONG_QUAY' },
     { id: 'VUNGTAU', name: 'Vũng Tàu', zone: 'VUNGTAU_BAI_SAU' }
 ];
-const parkedBus = { x: 1638, y: 1036, w: 154, h: 50 };
+const busTerminal = { zone: 'BREEZE_AREA', arrivalX: 470, arrivalY: 425 };
+const terminalBuses = [
+    { x: 110, y: 240, w: 154, h: 50 },
+    { x: 350, y: 240, w: 154, h: 50 },
+    { x: 590, y: 240, w: 154, h: 50 },
+    { x: 110, y: 350, w: 154, h: 50 },
+    { x: 350, y: 350, w: 154, h: 50 },
+    { x: 590, y: 350, w: 154, h: 50 }
+];
 let showBusRoutes = false;
 let busScene = null;
 
@@ -2706,7 +2714,7 @@ function drawShopInterior() {
     ctx.font = "bold 18px 'Chakra Petch', sans-serif";
     ctx.fillStyle = "#ffe099";
     ctx.fillText(shop.name, 500, 144, 320);
-    ctx.font = "bold 12px 'Chakra Petch', sans-serif";
+    c.font = "bold 12px 'Chakra Petch', sans-serif";
     ctx.fillStyle = "#e6d2b5";
     ctx.fillText(isResidence ? "🏡 Không gian sinh hoạt" : "🕒 Giờ mở cửa: " + shopHoursLabel(shop), 500, 163);
 
@@ -3900,6 +3908,37 @@ function buildAllZonesOpenWorld() {
         const c = zoneCanvases[zid].getContext('2d');
         drawOpenWorldBase(c, zid, "#7ab068", "#659c54", "#dce6e8", "#546269");
 
+        // Khuôn viên bến xe, chừa đường lên Công Viên ở x=920..1080.
+        pRect(c, 40, 30, 840, 460, '#b9ad94');
+        pRect(c, 48, 38, 824, 444, '#c8bea7');
+        for (let y = 55; y < 470; y += 40) {
+            for (let x = 65; x < 860; x += 60) {
+                pRect(c, x, y, 4, 2, '#b5aa92');
+            }
+        }
+        // Hai lối nối từ mặt bằng ra đường chính, đủ rộng cho xe khách.
+        pRect(c, 140, 482, 160, 34, '#c8bea7');
+        pRect(c, 620, 482, 160, 34, '#c8bea7');
+        pOutlinedRect(c, 85, 65, 720, 135, '#e1ceb0');
+        pOutlinedRect(c, 75, 55, 740, 25, '#76554b');
+        drawRentalStorefrontSign(c, 180, 83, 530,
+            'BẾN XE LIÊN TỈNH 5AM', 'Đà Lạt · Miền Tây · Vũng Tàu', '#59685a', '#e4bd83');
+        for (const x of [115, 240, 565, 690]) {
+            pOutlinedRect(c, x, 151, 90, 32, '#678b8b');
+        }
+        pOutlinedRect(c, 390, 145, 105, 55, '#9f8061');
+        addCollider(zid, 85, 65, 720, 135);
+        c.fillStyle = PAL.OUTLINE;
+        c.textAlign = 'center';
+        c.font = "bold 12px 'Chakra Petch', sans-serif";
+        for (const [index, bus] of terminalBuses.entries()) {
+            pOutlinedRect(c, bus.x - 10, bus.y - 9, 180, 76, '#9a9486');
+            pRect(c, bus.x - 6, bus.y - 5, 172, 68, '#c8bea7');
+            c.fillText('Ô ' + (index + 1), bus.x + 77, bus.y + 85);
+        }
+        c.fillText('LỐI VÀO', 220, 476);
+        c.fillText('LỐI RA', 700, 476);
+
         // Bờ kè đá & Biển xanh phía Nam (y = 820..1400)
         pOutlinedRect(c, 0, 800, WORLD_W, 26, "#95a5a6");
         pRect(c, 0, 826, WORLD_W, 574, "#1b7895");
@@ -3926,8 +3965,8 @@ function buildAllZonesOpenWorld() {
             drawBikeFrame(c, x, 408, "#b96553");
         }
 
-        drawShadeTree(c, 280, 360, 1.15);
-        drawShadeTree(c, 1120, 360, 1.15);
+        drawShadeTree(c, 1880, 140, 1.15);
+        drawShadeTree(c, 1880, 370, 1.15);
         drawParkBench(c, 420, 760);
         drawParkBench(c, 1280, 760);
     }
@@ -3979,7 +4018,7 @@ function drawVilla(c, x, y, width, name, color) {
 }
 
 buildHomeBackground();
-// Ba khu Đà Lạt dùng lại cùng kích thước bản đồ, camera và hệ va chạm hiện có.
+// Cảnh quan Đà Lạt: phố chợ dốc, thung lũng nhà kính và ga cổ giữa đồi thông.
 for (const [zid, colors] of [
     ['DALAT_NIGHT', ['#5f7658', '#4b6148', '#cbbba5', '#62585b']],
     ['DALAT_GREENHOUSE', ['#75945e', '#5c7d4d', '#d8ccb3', '#665c55']],
@@ -3994,70 +4033,697 @@ for (const [zid, colors] of [
     const c = zoneCanvases[zid].getContext('2d');
     drawOpenWorldBase(c, zid, ...colors);
 }
-{
-    const c = zoneCanvases.DALAT_GREENHOUSE.getContext('2d');
-    for (const x of [230, 670, 1110, 1550]) {
-        pOutlinedRect(c, x, 210, 300, 180, '#b8d4ce');
-        pRect(c, x + 10, 224, 280, 150, 'rgba(177, 218, 191, 0.42)');
-        for (let row = 0; row < 3; row++) {
-            pRect(c, x + 22, 270 + row * 30, 256, 5, '#55774b');
-            for (let i = 0; i < 8; i++) pRect(c, x + 30 + i * 32, 255 + row * 30, 9, 16, '#d76778');
+function drawDalatMarketStall(c, x, y, awning, label) {
+    pRect(c, x - 4, y + 64, 162, 10, 'rgba(48,42,36,0.24)');
+    pOutlinedRect(c, x, y + 13, 7, 57, '#79583f');
+    pOutlinedRect(c, x + 143, y + 13, 7, 57, '#79583f');
+    pOutlinedRect(c, x - 8, y + 4, 166, 25, awning, '#554437');
+    for (let i = 0; i < 8; i += 2) pRect(c, x + i * 9, y + 7, 9, 19, '#f7e8cf');
+    pOutlinedRect(c, x, y + 43, 146, 25, '#9c704b');
+    pOutlinedRect(c, x + 7, y + 35, 132, 18, '#e6d2b0');
+    for (let i = 0; i < 5; i++) {
+        const color = ['#cf6e73', '#e5b24f', '#7c9c76', '#b95d57', '#d99d79'][i];
+        pOutlinedRect(c, x + 14 + i * 23, y + 38, 16, 11, color);
+        pRect(c, x + 17 + i * 23, y + 40, 8, 2, '#fff0d4');
+    }
+    pOutlinedRect(c, x + 45, y - 19, 65, 21, '#f5e7c8');
+    c.font = "bold 9px 'Chakra Petch', sans-serif"; c.fillStyle = '#584336'; c.textAlign = 'center';
+    c.fillText(label, x + 77, y - 5, 60);
+}
+
+function drawDalatGreenhouse(c, x, y, width, height, tint, crop) {
+    // Khung nhà kính có mái hai dốc, kính chia ô và các luống trồng nhìn xuyên qua.
+    pRect(c, x - 12, y + height - 2, width + 25, 16, 'rgba(48,55,45,0.20)');
+    pOutlinedRect(c, x, y + 20, width, height - 20, '#aec2ad', '#536657');
+    c.fillStyle = tint;
+    c.beginPath(); c.moveTo(x - 4, y + 24); c.lineTo(x + width / 2, y - 17); c.lineTo(x + width + 4, y + 24); c.closePath(); c.fill();
+    c.strokeStyle = '#526757'; c.lineWidth = 5; c.stroke();
+    pRect(c, x + 9, y + 25, width - 18, height - 12, 'rgba(184,220,202,0.58)');
+    pRect(c, x + 12, y + 39, width - 24, 5, '#738e78');
+    for (let row = 0; row < 3; row++) {
+        const ry = y + 55 + row * 31;
+        pRect(c, x + 22, ry, width - 44, 8, crop === 'flower' ? '#5a784d' : '#627b4e');
+        for (let i = 0; i < Math.floor((width - 58) / 25); i++) {
+            const px = x + 30 + i * 25;
+            if (crop === 'strawberry') {
+                pRect(c, px + 4, ry - 8, 10, 10, '#4d8a55');
+                pRect(c, px + 7, ry - 3, 6, 7, i % 2 ? '#d54f58' : '#e4775d');
+            } else if (crop === 'flower') {
+                pRect(c, px + 6, ry - 9, 3, 10, '#47724b');
+                pRect(c, px + 2, ry - 12, 10, 6, ['#d76f88', '#e8bd62', '#a779bd'][i % 3]);
+            } else {
+                pRect(c, px + 5, ry - 6, 8, 8, '#527743');
+                pRect(c, px + 7, ry - 11, 5, 6, '#8e573e');
+            }
         }
     }
-    pOutlinedRect(c, 900, 850, 230, 100, '#846f4a');
+    pRect(c, x + width / 2 - 2, y + 25, 4, height - 22, '#809686');
+    for (let wx = x + 20; wx < x + width; wx += 38) pRect(c, wx, y + 30, 2, height - 30, 'rgba(76,102,83,0.65)');
+    addCollider('DALAT_GREENHOUSE', x, y + 16, width, height - 13);
 }
-{
-    const c = zoneCanvases.DALAT_PINE.getContext('2d');
-    for (let x = 90; x < 1900; x += 230) drawShadeTree(c, x, 190 + (x % 3) * 80, 1.8);
-    drawFreestandingBuilding(c, 'DALAT_PINE', 820, 760, 310, 190, { title: 'BIỆT THỰ ĐỒI THÔNG', wallCol: '#d6c8a8' });
-}
-{
-    const c = zoneCanvases.MEKONG_QUAY.getContext('2d');
-    pRect(c, 0, 1110, WORLD_W, 290, '#4c8990');
-    for (let x = 0; x < WORLD_W; x += 90) pRect(c, x, 1140 + (x % 4) * 12, 62, 3, '#82b8ac');
-    drawFreestandingBuilding(c, 'MEKONG_QUAY', 720, 250, 360, 210, { title: 'MẶT BẰNG BẾN NINH KIỀU', wallCol: '#d8c59a' });
-}
-{
-    const c = zoneCanvases.MEKONG_FLOATING.getContext('2d');
-    pRect(c, 0, 1110, WORLD_W, 290, '#4c8990');
-    for (const [x, y] of [[730, 900], [1000, 900], [1270, 900]]) {
-        pOutlinedRect(c, x - 56, y - 35, 112, 54, '#79583d');
-        pRect(c, x - 45, y - 26, 90, 38, '#d59c51');
-        pRect(c, x - 23, y - 62, 46, 27, '#b75843');
-    }
-    pOutlinedRect(c, 900, 850, 230, 100, '#846f4a');
-}
-{
-    const c = zoneCanvases.MEKONG_CRAFT.getContext('2d');
-    drawFreestandingBuilding(c, 'MEKONG_CRAFT', 820, 760, 330, 195, { title: 'LÀNG NGHỀ DỆT LỤA', wallCol: '#d4b993' });
-    for (let x = 560; x < 1450; x += 180) {
-        pOutlinedRect(c, x, 470, 115, 86, '#684e42');
-        for (let i = 0; i < 5; i++) pRect(c, x + 18 + i * 17, 482, 8, 58, ['#ba6470', '#71907d', '#d8b45d'][i % 3]);
+
+function drawDalatPineTree(c, x, y, scale = 1) {
+    const sx = (n) => Math.round(n * scale);
+    pRect(c, x - sx(28), y - sx(3), sx(72), sx(10), 'rgba(34,43,34,0.22)');
+    pOutlinedRect(c, x + sx(13), y - sx(64), sx(13), sx(69), '#75553b');
+    for (let level = 0; level < 5; level++) {
+        const top = y - sx(164) + sx(level * 24);
+        const half = sx(17 + level * 9);
+        c.fillStyle = level % 2 ? '#315b46' : '#3b6b4e';
+        c.strokeStyle = '#294b3b'; c.lineWidth = Math.max(2, sx(3));
+        c.beginPath(); c.moveTo(x + sx(20), top); c.lineTo(x + sx(20) - half, top + sx(48));
+        c.lineTo(x + sx(20) + half, top + sx(48)); c.closePath(); c.fill(); c.stroke();
+        c.fillStyle = '#73966a';
+        c.beginPath(); c.moveTo(x + sx(17), top + sx(18));
+        c.lineTo(x + sx(20) - half * 0.52, top + sx(42));
+        c.lineTo(x + sx(20), top + sx(37)); c.closePath(); c.fill();
     }
 }
-{
-    const c = zoneCanvases.VUNGTAU_BAI_SAU.getContext('2d');
-    pRect(c, 0, 1100, WORLD_W, 300, '#4d9ca8');
-    for (let x = 0; x < WORLD_W; x += 105) pRect(c, x, 1140 + (x % 4) * 14, 72, 3, '#9bd1ca');
-    drawFreestandingBuilding(c, 'VUNGTAU_BAI_SAU', 690, 245, 360, 220, { title: 'PHỐ BIỂN BÃI SAU', wallCol: '#e0c49c' });
-}
-{
-    const c = zoneCanvases.VUNGTAU_FISHING.getContext('2d');
-    pRect(c, 0, 1110, WORLD_W, 290, '#4d9ca8');
-    for (let x = 220; x < 1780; x += 300) {
-        pOutlinedRect(c, x, 770, 180, 84, '#77573d');
-        pRect(c, x + 18, 785, 144, 52, '#d8aa61');
-        pOutlinedRect(c, x + 54, 744, 70, 34, '#b85743');
+
+function drawDalatStation(c, zone) {
+    // Sân ga, đường ray và khối nhà Art Deco với ba đầu hồi gợi dáng núi Langbiang.
+    pRect(c, 505, 862, 1015, 16, 'rgba(41,44,40,0.22)');
+    pOutlinedRect(c, 478, 690, 1060, 175, '#897f70');
+    pRect(c, 491, 701, 1034, 150, '#c8bca5');
+    for (let x = 520; x < 1500; x += 34) pRect(c, x, 714, 20, 2, '#a79a82');
+    // Lối tàu đôi và tà vẹt chạy ngang phía trước sân ga.
+    pRect(c, 380, 904, 1240, 11, '#4d4944'); pRect(c, 380, 934, 1240, 11, '#4d4944');
+    for (let x = 390; x < 1610; x += 42) pOutlinedRect(c, x, 898, 8, 43, '#775c47');
+    // Tường ga màu vàng kem, dãy cửa vòm và mái ngói đỏ ba chóp.
+    pOutlinedRect(c, 671, 597, 682, 159, '#e7d5b1', '#5b4838');
+    pRect(c, 687, 614, 650, 12, '#f4e6ca');
+    const gables = [
+        [[680, 644], [796, 553], [912, 644]],
+        [[850, 644], [1012, 538], [1174, 644]],
+        [[1112, 644], [1228, 553], [1344, 644]]
+    ];
+    for (const points of gables) {
+        c.fillStyle = '#a94e42'; c.strokeStyle = '#593c36'; c.lineWidth = 8;
+        c.beginPath(); c.moveTo(...points[0]); c.lineTo(...points[1]); c.lineTo(...points[2]); c.closePath(); c.fill(); c.stroke();
+        c.strokeStyle = '#d18663'; c.lineWidth = 4;
+        c.beginPath(); c.moveTo(points[0][0] + 13, points[0][1] - 3); c.lineTo(points[1][0], points[1][1] + 14); c.lineTo(points[2][0] - 13, points[2][1] - 3); c.stroke();
+    }
+    // Relógio tròn, cửa vòm xanh sẫm, cột và bảng tên ga ở mặt tiền.
+    c.fillStyle = '#f1e2bf'; c.strokeStyle = '#67483a'; c.lineWidth = 5;
+    c.beginPath(); c.arc(1012, 611, 27, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.strokeStyle = '#634a3a'; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(1012, 611); c.lineTo(1012, 592); c.moveTo(1012, 611); c.lineTo(1026, 618); c.stroke();
+    for (const x of [716, 818, 914, 1096, 1192, 1286]) {
+        pOutlinedRect(c, x, 638, 56, 85, '#658183', '#6d523d');
+        pRect(c, x + 7, 646, 42, 68, '#99b9ad');
+        pRect(c, x + 26, 647, 3, 66, '#e7d7b5');
+    }
+    pOutlinedRect(c, 909, 671, 206, 41, '#7c4439');
+    pOutlinedRect(c, 917, 678, 190, 27, '#efd7a2');
+    c.font = "bold 17px 'Chakra Petch', sans-serif"; c.fillStyle = '#754238'; c.textAlign = 'center';
+    c.fillText('GA ĐÀ LẠT', 1012, 698);
+    for (const x of [650, 1350]) {
+        pRect(c, x, 735, 18, 66, '#7e5540');
+        pRect(c, x - 5, 730, 28, 8, '#d0a468');
+    }
+    addCollider(zone, 671, 596, 682, 151);
+    // Đầu máy hơi nước đỏ và toa gỗ, đặt riêng trên đường ray phía trước ga.
+    pRect(c, 652, 826, 753, 11, 'rgba(45,40,36,0.24)');
+    pOutlinedRect(c, 708, 790, 246, 83, '#b74e3c', '#4f4137');
+    pRect(c, 729, 799, 122, 24, '#d77a50');
+    pOutlinedRect(c, 858, 782, 72, 72, '#37393a', '#4f4137');
+    pRect(c, 874, 794, 40, 30, '#d6e2d4');
+    pOutlinedRect(c, 670, 812, 37, 41, '#463c36');
+    pRect(c, 668, 850, 296, 7, '#393735');
+    for (const x of [724, 913]) {
+        c.fillStyle = '#373534'; c.beginPath(); c.arc(x, 873, 18, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#b88a58'; c.beginPath(); c.arc(x, 873, 8, 0, Math.PI * 2); c.fill();
+    }
+    pRect(c, 833, 761, 12, 25, '#53463d'); pRect(c, 835, 749, 8, 14, '#a84d3e');
+    for (const [x, color] of [[980, '#718b78'], [1160, '#c28b58']]) {
+        pOutlinedRect(c, x, 803, 169, 56, color, '#51453c');
+        pRect(c, x + 13, 812, 142, 30, '#9eb5a4');
+        for (const wx of [x + 24, x + 68, x + 112]) pOutlinedRect(c, wx, 816, 28, 24, '#d9e2d1');
+        for (const wx of [x + 31, x + 118]) {
+            c.fillStyle = '#393735'; c.beginPath(); c.arc(wx, 870, 13, 0, Math.PI * 2); c.fill();
+            c.fillStyle = '#b88a58'; c.beginPath(); c.arc(wx, 870, 6, 0, Math.PI * 2); c.fill();
+        }
+    }
+    addCollider(zone, 700, 790, 680, 83);
+    // Bụi hoa ở sân ga và bảng chỉ đường gỗ.
+    for (const x of [545, 1480]) {
+        pOutlinedRect(c, x, 820, 96, 31, '#627f60');
+        for (let i = 0; i < 6; i++) pRect(c, x + 9 + i * 13, 811 + (i % 2) * 4, 8, 10, i % 3 ? '#d47a8b' : '#efc767');
     }
 }
+
 {
-    const c = zoneCanvases.VUNGTAU_LIGHTHOUSE.getContext('2d');
-    for (let x = 150; x < 1800; x += 260) drawTerracottaPlant(c, x, 500 + (x % 3) * 50, 1.2);
-    pOutlinedRect(c, 936, 500, 158, 300, '#ead8ad');
-    pRect(c, 962, 530, 106, 80, '#f3e7c7');
-    pRect(c, 992, 612, 46, 164, '#d8c399');
-    pOutlinedRect(c, 920, 478, 190, 34, '#c84b31');
-    pRect(c, 978, 538, 68, 38, '#9ed1d1');
+    const zone = 'DALAT_NIGHT';
+    const c = zoneCanvases[zone].getContext('2d');
+    // Con dốc lát đá và bậc tam cấp bẻ nhẹ qua quảng trường chợ.
+    pOutlinedRect(c, 0, 445, WORLD_W, 298, '#c8b9a3');
+    pRect(c, 0, 461, WORLD_W, 265, '#b9ad9a');
+    for (let row = 0; row < 9; row++) {
+        const y = 480 + row * 28;
+        pRect(c, 0, y, WORLD_W, 3, row % 2 ? '#d2c3aa' : '#a79a88');
+        for (let x = (row % 2) * 24; x < WORLD_W; x += 48) pRect(c, x, y + 4, 2, 22, '#a99b88');
+    }
+    // Khối chợ mái ngói, bảng neon và cửa sạp sáng đèn.
+    pOutlinedRect(c, 700, 239, 595, 197, '#d1b38a', '#514137');
+    drawTiledRoof(c, 687, 220, 621, 54, '#a94f43', '#533c35');
+    for (const x of [730, 852, 974, 1096, 1218]) {
+        pOutlinedRect(c, x, 292, 83, 108, '#6d5949');
+        pRect(c, x + 8, 301, 67, 48, '#b9c3ae');
+        pRect(c, x + 14, 307, 55, 36, '#dfb76e');
+        pRect(c, x + 8, 354, 67, 38, '#805e47');
+    }
+    pOutlinedRect(c, 838, 404, 319, 48, '#754238');
+    pOutlinedRect(c, 846, 411, 303, 34, '#f0d395');
+    c.font = "bold 19px 'Chakra Petch', sans-serif"; c.fillStyle = '#703c32'; c.textAlign = 'center';
+    c.fillText('CHỢ ĐÊM ĐÀ LẠT', 997, 434);
+    addCollider(zone, 700, 239, 595, 197);
+    // Mặt tiền quán nhỏ và cầu thang dốc đặt gần phố đi bộ để hiện rõ khi vừa tới.
+    for (const [x, wall, roof] of [[265, '#e8d1ad', '#9b5547'], [1455, '#d9c9ad', '#745649']]) {
+        drawWeatheredWall(c, x, 565, 230, 132, wall, roof, '#f3e3c5');
+        drawTiledRoof(c, x - 12, 543, 254, 38, roof, '#514039');
+        drawShutteredWindow(c, x + 24, 602, 39, 43);
+        drawShutteredWindow(c, x + 166, 602, 39, 43);
+        pOutlinedRect(c, x + 92, 646, 45, 51, '#70503d');
+        pOutlinedRect(c, x + 42, 615, 146, 24, '#f0d89f');
+        c.font = "bold 10px 'Chakra Petch', sans-serif"; c.fillStyle = '#714137'; c.textAlign = 'center';
+        c.fillText(x < 500 ? 'TIỆM LEN' : 'QUÁN SỮA', x + 115, 632);
+        addCollider(zone, x, 565, 230, 132);
+    }
+    for (let i = 0; i < 11; i++) {
+        const sx = 390 + i * 21, sy = 632 + i * 15;
+        pOutlinedRect(c, sx, sy, 176, 19, i % 2 ? '#c8b99f' : '#dfd0b5');
+        pRect(c, sx + 7, sy + 13, 162, 3, '#8d7e6b');
+    }
+    // Cổng chợ treo đèn lồng, đặt ngay trên dãy sạp thay vì khuất ở đầu bản đồ.
+    pRect(c, 790, 760, 9, 116, '#714b39'); pRect(c, 1196, 760, 9, 116, '#714b39');
+    pOutlinedRect(c, 776, 745, 443, 45, '#78483b');
+    pOutlinedRect(c, 784, 753, 427, 29, '#f0d59c');
+    c.font = "bold 18px 'Chakra Petch', sans-serif"; c.fillStyle = '#743d34'; c.textAlign = 'center';
+    c.fillText('CHỢ ĐÊM ĐÀ LẠT', 997, 774);
+    // Dãy sạp mái bạt dọc lối dốc, đèn lồng và dây cờ ấm màu.
+    drawDalatMarketStall(c, 225, 826, '#ad5148', 'ĐỒ LEN');
+    drawDalatMarketStall(c, 495, 922, '#637b75', 'DÂU TÂY');
+    drawDalatMarketStall(c, 795, 826, '#cf8e48', 'BÁNH NÓNG');
+    drawDalatMarketStall(c, 1095, 922, '#a95349', 'HOA TƯƠI');
+    drawDalatMarketStall(c, 1400, 826, '#587f83', 'ĐẶC SẢN');
+    drawDalatMarketStall(c, 1660, 922, '#b86350', 'TRÀ & MỨT');
+    for (let i = 0; i < 8; i++) {
+        const x = 185 + i * 225;
+        pRect(c, x, 756, 3, 67, '#59483b');
+        pRect(c, x + 2, 758, 88, 3, '#685144');
+        pRect(c, x + 16, 761, 14, 20, i % 2 ? '#d97561' : '#e4b34e');
+        pRect(c, x + 54, 761, 14, 20, i % 2 ? '#e4b34e' : '#d97561');
+    }
+    for (const x of [385, 1360]) drawParkBench(c, x, 700);
+    pOutlinedRect(c, 837, 468, 320, 37, '#735843');
+    pRect(c, 846, 477, 302, 19, '#ead8b8');
+    c.font = "bold 12px 'Chakra Petch', sans-serif"; c.fillStyle = '#59463a';
+    c.fillText('PHỐ DỐC · CHỢ ĐÊM · ĐÀ LẠT', 997, 492);
+}
+{
+    const zone = 'DALAT_GREENHOUSE';
+    const c = zoneCanvases[zone].getContext('2d');
+    // Thung lũng mở với ruộng bậc thấp, rãnh tưới và nhà kính nhiều nhịp mái.
+    pRect(c, 0, 755, WORLD_W, 310, '#8ba36d');
+    for (let y = 774; y < 1050; y += 36) {
+        pRect(c, 0, y, WORLD_W, 4, '#6f8b5b');
+        pRect(c, 0, y + 5, WORLD_W, 7, '#a4b97d');
+    }
+    drawDalatGreenhouse(c, 122, 710, 340, 208, 'rgba(190,226,215,0.78)', 'strawberry');
+    drawDalatGreenhouse(c, 558, 690, 340, 208, 'rgba(180,216,214,0.76)', 'flower');
+    drawDalatGreenhouse(c, 1002, 710, 340, 208, 'rgba(203,225,205,0.76)', 'coffee');
+    drawDalatGreenhouse(c, 1450, 690, 340, 208, 'rgba(183,215,204,0.76)', 'strawberry');
+    // Luống hoa ngoài trời và vườn dâu thấp, xen lối đất để người chơi đi lại.
+    for (let row = 0; row < 4; row++) {
+        const y = 936 + row * 40;
+        pRect(c, 190, y, 520, 13, '#5c784c'); pRect(c, 1292, y, 500, 13, '#5c784c');
+        for (let i = 0; i < 20; i++) {
+            const x1 = 202 + i * 24, x2 = 1302 + i * 23;
+            pRect(c, x1 + 5, y - 12, 4, 13, '#467549'); pRect(c, x1, y - 16, 11, 6, i % 3 ? '#d96786' : '#edc467');
+            pRect(c, x2 + 5, y - 8, 7, 8, '#4b824e'); pRect(c, x2 + 5, y - 4, 5, 7, '#d85156');
+        }
+    }
+    // Chòi nông cụ, bồn nước và các thùng hái dâu đặt cạnh lối đi.
+    pOutlinedRect(c, 900, 925, 146, 48, '#8b744e');
+    pRect(c, 910, 932, 126, 32, '#7fa9a5');
+    pRect(c, 920, 939, 106, 4, '#b4d3c1');
+    for (const [x, y] of [[720, 790], [1280, 790]]) {
+        pOutlinedRect(c, x, y, 46, 40, '#8e6746');
+        pRect(c, x + 6, y + 7, 34, 26, '#cc6258');
+        for (let i = 0; i < 4; i++) pRect(c, x + 10 + i * 7, y + 13, 4, 4, '#f0d48e');
+    }
+    pOutlinedRect(c, 1078, 1080, 58, 42, '#87613f');
+    pRect(c, 1085, 1088, 44, 25, '#c2d7bb');
+    for (let i = 0; i < 4; i++) {
+        pRect(c, 1091 + i * 9, 1084, 3, 11, '#48754c');
+        pRect(c, 1087 + i * 9, 1080, 10, 6, ['#d9788f', '#ecc66b', '#a983bd', '#db7380'][i]);
+    }
+    pOutlinedRect(c, 724, 978, 78, 39, '#8b6545');
+    pRect(c, 731, 984, 64, 26, '#cf6759');
+    for (let i = 0; i < 5; i++) pRect(c, 737 + i * 11, 988 + (i % 2) * 7, 6, 6, '#f1d58d');
+    pOutlinedRect(c, 1215, 978, 92, 43, '#77563f');
+    pRect(c, 1222, 985, 78, 28, '#c5a374');
+    for (let i = 0; i < 3; i++) pRect(c, 1228 + i * 23, 990, 14, 19, '#704d38');
+    pOutlinedRect(c, 855, 835, 300, 44, '#718a74');
+    pOutlinedRect(c, 864, 843, 282, 28, '#e5ebd8');
+    c.font = "bold 15px 'Chakra Petch', sans-serif"; c.fillStyle = '#526a51'; c.textAlign = 'center';
+    c.fillText('THUNG LŨNG NHÀ KÍNH', 1005, 863);
+}
+{
+    const zone = 'DALAT_PINE';
+    const c = zoneCanvases[zone].getContext('2d');
+    // Đồi thông ôm quanh sân ga, dải đồi xanh và biệt thự Pháp giữa vườn cẩm tú cầu.
+    pRect(c, 0, 0, WORLD_W, 745, '#78916c');
+    for (let x = -20; x < WORLD_W; x += 176) {
+        const crest = 175 + (Math.floor(x / 176) % 4) * 35;
+        pRect(c, x, crest, 112, 7, '#617b5e');
+        pRect(c, x + 18, crest - 11, 69, 12, '#8da079');
+    }
+    for (const [x, y, scale] of [[28, 735, 1.35], [190, 730, 1.15], [385, 744, 1.3], [1510, 744, 1.25], [1705, 730, 1.42], [1905, 743, 1.2]]) {
+        drawDalatPineTree(c, x, y, scale);
+    }
+    // Mái biệt thự ngói đỏ phía trên vườn, không dùng lại mẫu storefront của Sài Gòn.
+    drawWeatheredWall(c, 180, 300, 288, 163, '#e5d4b5', '#885f4c', '#f4e5ca');
+    drawTiledRoof(c, 163, 276, 322, 48, '#a45246', '#563d37');
+    for (const x of [208, 326, 405]) drawShutteredWindow(c, x, 347, 42, 49);
+    pOutlinedRect(c, 292, 410, 64, 53, '#58726d'); pRect(c, 303, 421, 42, 42, '#283b3b');
+    addCollider(zone, 180, 301, 288, 163);
+    drawWeatheredWall(c, 1465, 275, 300, 177, '#d8d0b7', '#6f7164', '#eee3cc');
+    drawTiledRoof(c, 1446, 251, 338, 50, '#79584a', '#493d37');
+    for (const x of [1503, 1610, 1708]) drawShutteredWindow(c, x, 329, 43, 50);
+    pOutlinedRect(c, 1580, 398, 66, 54, '#506d65'); pRect(c, 1591, 410, 44, 42, '#263b3a');
+    addCollider(zone, 1465, 276, 300, 176);
+    // Thảm hoa dọc lối ga, sân chờ lát đá và mái che đỏ kem.
+    for (const x of [510, 1410]) {
+        pOutlinedRect(c, x, 690, 104, 52, '#66815d');
+        for (let i = 0; i < 8; i++) pRect(c, x + 9 + i * 11, 680 + (i % 2) * 5, 7, 12, ['#d36f8b', '#bd8ac1', '#efc469'][i % 3]);
+    }
+    drawDalatStation(c, zone);
+    // Cột đèn ga kiểu cổ và ghế chờ ở sân lát đá.
+    for (const x of [603, 1535]) {
+        pRect(c, x, 748, 5, 96, '#584b41');
+        pOutlinedRect(c, x - 10, 741, 25, 18, '#f0c36d');
+        pRect(c, x - 5, 746, 15, 8, '#fff0c2');
+    }
+    for (const x of [560, 1450]) {
+        pOutlinedRect(c, x, 956, 112, 12, '#725b48');
+        pRect(c, x + 8, 968, 8, 23, '#59483b'); pRect(c, x + 96, 968, 8, 23, '#59483b');
+    }
+}
+function drawMekongRiver(c, startY, shallow = '#5ea6a0') {
+    pRect(c, 0, startY - 54, WORLD_W, 54, '#c4b18b');
+    for (let x = 0; x < WORLD_W; x += 42) pRect(c, x, startY - 48, 3, 45, '#9e8f73');
+    pRect(c, 0, startY, WORLD_W, WORLD_H - startY, '#397f85');
+    pRect(c, 0, startY, WORLD_W, 75, shallow);
+    pRect(c, 0, startY + 75, WORLD_W, 120, '#4a9795');
+    for (let y = startY + 25; y < WORLD_H; y += 72) {
+        for (let x = 20; x < WORLD_W; x += 118) {
+            pRect(c, x + (y % 17), y, 54, 3, 'rgba(210,238,213,0.60)');
+            pRect(c, x + 46, y + 24, 29, 2, 'rgba(181,222,205,0.45)');
+        }
+    }
+}
+
+function drawMekongCargoBoat(c, x, y, body, canopy, poleItem) {
+    // Ghe ba lá dài, mui che màu và cây bẹo treo món hàng phía mũi.
+    pRect(c, x + 12, y + 48, 190, 10, 'rgba(27,45,43,0.24)');
+    c.fillStyle = '#493b2e'; c.beginPath();
+    c.moveTo(x, y + 19); c.lineTo(x + 18, y + 9); c.lineTo(x + 178, y + 9);
+    c.lineTo(x + 205, y + 22); c.lineTo(x + 184, y + 42); c.lineTo(x + 23, y + 42); c.closePath(); c.fill();
+    pRect(c, x + 18, y + 17, 166, 22, body);
+    pRect(c, x + 48, y + 12, 94, 27, canopy);
+    for (let i = 0; i < 5; i++) pRect(c, x + 53 + i * 17, y + 14, 8, 23, i % 2 ? '#f1d5a0' : canopy);
+    pRect(c, x + 15, y + 8, 3, 30, '#694e36');
+    pRect(c, x + 5, y - 5, 26, 15, '#d6bd84');
+    c.font = "bold 9px 'Chakra Petch', sans-serif"; c.fillStyle = '#5f4833'; c.textAlign = 'center';
+    c.fillText(poleItem, x + 18, y + 5, 36);
+    pRect(c, x + 84, y + 39, 4, 14, '#78583d');
+}
+
+{
+    const zone = 'MEKONG_QUAY';
+    const c = zoneCanvases[zone].getContext('2d');
+    // Bến Ninh Kiều: phố đèn phía trong, quảng trường lát đá và cầu tàu rộng.
+    pRect(c, 0, 0, WORLD_W, 752, '#78a17a');
+    for (const [x, w, wall, sign] of [[90, 270, '#e8d3ae', 'NHÀ HÀNG SÔNG HẬU'], [430, 245, '#d8dfc7', 'CÀ PHÊ BẾN SÔNG'], [1320, 275, '#dfc4a0', 'PHỐ NINH KIỀU'], [1660, 240, '#d1ddc7', 'BẾN DU THUYỀN']]) {
+        drawWeatheredWall(c, x, 340, w, 190, wall, '#725541', '#f1dfbf');
+        drawTiledRoof(c, x - 12, 316, w + 24, 43, '#93604a', '#504038');
+        for (const wx of [x + 24, x + w - 68]) drawShutteredWindow(c, wx, 394, 42, 51);
+        pOutlinedRect(c, x + w / 2 - 57, 474, 114, 34, '#74503b');
+        c.font = "bold 9px 'Chakra Petch', sans-serif"; c.fillStyle = '#fff0d1'; c.textAlign = 'center';
+        c.fillText(sign, x + w / 2, 495, w - 30);
+        addCollider(zone, x, 340, w, 190);
+    }
+    pOutlinedRect(c, 585, 617, 830, 113, '#8e806d');
+    pRect(c, 598, 630, 804, 85, '#d5c4a4');
+    for (let x = 610; x < 1400; x += 56) pRect(c, x, 632, 2, 80, '#b5a789');
+    pOutlinedRect(c, 782, 540, 436, 54, '#75463a');
+    pOutlinedRect(c, 791, 548, 418, 38, '#f0d599');
+    c.font = "bold 19px 'Chakra Petch', sans-serif"; c.fillStyle = '#704238'; c.textAlign = 'center';
+    c.fillText('BẾN NINH KIỀU', 1000, 574);
+    // Cầu đi bộ cong cách điệu, lan can vàng và dải đèn trên sông.
+    c.strokeStyle = '#e6c37b'; c.lineWidth = 14; c.beginPath();
+    c.moveTo(90, 806); c.quadraticCurveTo(480, 736, 850, 806); c.quadraticCurveTo(1240, 877, 1910, 798); c.stroke();
+    c.strokeStyle = '#795d45'; c.lineWidth = 4; c.beginPath();
+    c.moveTo(90, 797); c.quadraticCurveTo(480, 727, 850, 797); c.quadraticCurveTo(1240, 868, 1910, 789); c.stroke();
+    for (let x = 130; x < 1900; x += 120) {
+        pRect(c, x, 780 + Math.round(Math.sin(x * .008) * 24), 5, 33, '#72543d');
+        pRect(c, x - 7, 772 + Math.round(Math.sin(x * .008) * 24), 18, 9, '#f0c46c');
+    }
+    drawMekongRiver(c, 1010, '#6eb0a4');
+    // Cầu tàu và ghe chở khách neo ngay trước bến.
+    pOutlinedRect(c, 875, 936, 254, 28, '#755942'); pRect(c, 886, 943, 232, 14, '#bd9864');
+    for (let x = 900; x < 1110; x += 44) pRect(c, x, 960, 5, 54, '#76583e');
+    drawMekongCargoBoat(c, 1140, 957, '#a95142', '#e2b567', 'KHÁCH');
+}
+{
+    const zone = 'MEKONG_FLOATING';
+    const c = zoneCanvases[zone].getContext('2d');
+    // Chợ nổi là mặt sông rộng với bến gỗ hai bờ và ghe hàng quay mũi vào lối chợ.
+    pRect(c, 0, 0, WORLD_W, WORLD_H, '#74a27a');
+    pRect(c, 0, 752, WORLD_W, 49, '#a9926b');
+    pRect(c, 0, 801, WORLD_W, 309, '#478e91');
+    pRect(c, 0, 801, WORLD_W, 47, '#78b7a7');
+    for (let x = 0; x < WORLD_W; x += 70) {
+        pRect(c, x, 786, 4, 26, '#755a40');
+        pRect(c, x + 15, 868 + (x % 3) * 19, 47, 3, 'rgba(210,238,213,0.62)');
+    }
+    // Mấy căn chòi miệt vườn và bến nhỏ ven rạch.
+    for (const [x, wall, roof] of [[180, '#e3c99e', '#986044'], [1460, '#d3dfbf', '#815845']]) {
+        drawWeatheredWall(c, x, 484, 255, 170, wall, roof, '#f0dfbd');
+        drawTiledRoof(c, x - 15, 460, 285, 42, roof, '#4c4035');
+        drawShutteredWindow(c, x + 30, 542, 42, 49); drawShutteredWindow(c, x + 168, 542, 42, 49);
+        addCollider(zone, x, 484, 255, 170);
+    }
+    // Ghe hàng nhiều màu, mỗi ghe có cây bẹo treo đúng món đang bán.
+    drawMekongCargoBoat(c, 145, 857, '#a95142', '#e3b96a', 'DỪA');
+    drawMekongCargoBoat(c, 430, 978, '#567d69', '#cf9c55', 'XOÀI');
+    drawMekongCargoBoat(c, 725, 857, '#567f8a', '#dcaa5e', 'CÁ');
+    drawMekongCargoBoat(c, 1020, 978, '#ad6845', '#dfbd79', 'KHÓM');
+    drawMekongCargoBoat(c, 1315, 857, '#7b6653', '#d4a453', 'CHUỐI');
+    drawMekongCargoBoat(c, 1605, 978, '#9d4e45', '#d7b165', 'BÁN GÌ?');
+    // Sàn chợ nổi giữa sông và các thùng nông sản, làm điểm đứng gom hàng.
+    pOutlinedRect(c, 850, 736, 300, 41, '#775a40'); pRect(c, 860, 744, 280, 24, '#d1b17a');
+    pOutlinedRect(c, 884, 923, 64, 35, '#8b6545'); pRect(c, 891, 929, 50, 21, '#9e573f');
+    for (let i = 0; i < 4; i++) pRect(c, 896 + i * 10, 933, 6, 7, '#e1c269');
+    pOutlinedRect(c, 1220, 925, 64, 35, '#8b6545'); pRect(c, 1227, 931, 50, 21, '#d8b577');
+    pOutlinedRect(c, 870, 475, 260, 42, '#e8d6b1');
+    c.font = "bold 15px 'Chakra Petch', sans-serif"; c.fillStyle = '#624936'; c.textAlign = 'center';
+    c.fillText('CHỢ NỔI MIỆT VƯỜN', 1000, 502);
+}
+{
+    const zone = 'MEKONG_CRAFT';
+    const c = zoneCanvases[zone].getContext('2d');
+    // Xóm ven rạch, nhà gỗ sàn cao, hàng dừa nước và cầu ván nối các sân nghề.
+    pRect(c, 0, 0, WORLD_W, WORLD_H, '#71956e');
+    for (let x = 0; x < WORLD_W; x += 220) {
+        pRect(c, x, 280 + (x % 3) * 50, 98, 16, '#39775f');
+        pRect(c, x + 14, 266 + (x % 3) * 50, 73, 19, '#598f6c');
+    }
+    pRect(c, 0, 1010, WORLD_W, 390, '#43868a');
+    for (let x = 40; x < WORLD_W; x += 145) {
+        pOutlinedRect(c, x, 961, 118, 22, '#73583f');
+        pRect(c, x + 8, 968, 102, 8, '#bd9a65');
+    }
+    for (const [x, wall, roof] of [[175, '#e1c59a', '#80543c'], [620, '#d6d9b8', '#9a6648'], [1285, '#e5cda4', '#755744'], [1650, '#d7dfc2', '#976449']]) {
+        pRect(c, x + 6, 625, 250, 25, 'rgba(36,44,38,0.22)');
+        drawWeatheredWall(c, x, 470, 238, 160, wall, roof, '#f0dfbf');
+        drawTiledRoof(c, x - 14, 446, 266, 43, roof, '#4c3e34');
+        pRect(c, x - 10, 615, 258, 15, '#76563d');
+        for (const wx of [x + 25, x + 165]) drawShutteredWindow(c, wx, 525, 42, 49);
+        addCollider(zone, x, 470, 238, 160);
+    }
+    // Khung dệt, sợi tơ màu, khung phơi lụa và sạp kẹo dừa.
+    for (const [x, y, cloth] of [[350, 755, '#bf6477'], [715, 757, '#d6ad54'], [1080, 755, '#6c91a0'], [1445, 757, '#7f9a72']]) {
+        pOutlinedRect(c, x, y, 236, 142, '#75533c');
+        pRect(c, x + 10, y + 10, 216, 122, '#e0c99e');
+        pRect(c, x + 24, y + 22, 187, 93, cloth);
+        for (let i = 0; i < 8; i++) pRect(c, x + 29 + i * 24, y + 24, 6, 89, i % 2 ? '#f0dcae' : '#563f39');
+        pRect(c, x + 4, y + 3, 228, 6, '#443b32');
+    }
+    // Cầu khỉ nhỏ qua rạch và bảng làng nghề ở lối vào.
+    pOutlinedRect(c, 838, 677, 326, 50, '#6d513d'); pRect(c, 848, 685, 306, 34, '#e5d2aa');
+    c.font = "bold 16px 'Chakra Petch', sans-serif"; c.fillStyle = '#694637'; c.textAlign = 'center';
+    c.fillText('LÀNG NGHỀ VEN RẠCH', 1000, 708);
+    for (let i = 0; i < 12; i++) pRect(c, 810 + i * 32, 944 + (i % 2) * 4, 26, 5, '#dbc18e');
+}
+// Ba khu Vũng Tàu nằm ngang. Dải biển chạy xuyên suốt phía nam để khu nào
+// người chơi ghé cũng đọc được ngay đây là một thành phố biển.
+function drawVungTauCoast(c, zone, terrain = 'sand') {
+    pRect(c, 0, 744, WORLD_W, 66, terrain === 'cliff' ? '#a99e87' : '#d9c9a8');
+    for (let x = 0; x < WORLD_W; x += 48) {
+        pRect(c, x, 746, 3, 62, '#b9aa91');
+        pRect(c, x + 2, 776, 46, 2, '#c4b59c');
+    }
+    pRect(c, 0, 810, WORLD_W, 310, terrain === 'cliff' ? '#b9ad96' : '#efd49b');
+    for (let y = 824; y < 1100; y += 31) {
+        for (let x = 16; x < WORLD_W; x += 61) {
+            const offset = (x * 3 + y * 7) % 23;
+            pRect(c, x + offset, y, 5, 2, terrain === 'cliff' ? '#938c7b' : '#d1b77f');
+            pRect(c, x + 21, y + 13, 3, 2, '#fae6bd');
+        }
+    }
+    pRect(c, 0, 1087, WORLD_W, 33, terrain === 'cliff' ? '#8b8b7c' : '#d5bf90');
+    pRect(c, 0, 1120, WORLD_W, 280, '#247c96');
+    pRect(c, 0, 1120, WORLD_W, 54, '#69c2bd');
+    pRect(c, 0, 1174, WORLD_W, 91, '#3aa8b3');
+    pRect(c, 0, 1265, WORLD_W, 135, '#24718e');
+    for (let x = 0; x < WORLD_W; x += 76) {
+        pRect(c, x, 1115 + (Math.floor(x / 76) % 3) * 3, 72, 7, '#f1f2da');
+        pRect(c, x + 15, 1202, 34, 3, '#91d8ce');
+        pRect(c, x + 30, 1327, 32, 3, '#65b5c3');
+    }
+    addCollider(zone, 0, 1120, WORLD_W, 280);
+    if (terrain === 'sand') {
+        for (const x of [110, 1880]) drawBeachPalm(c, x, 858);
+    } else {
+        // Đá ven bờ thấp, thưa và có lối đi xuyên qua, không chặn tuyến ngang.
+        for (const [x, y, w] of [[80, 1060, 102], [310, 1080, 82], [1690, 1058, 112]]) {
+            pOutlinedRect(c, x, y, w, 29, '#737970');
+            pRect(c, x + 10, y - 5, w - 25, 12, '#a49f8e');
+        }
+    }
+}
+
+function drawBeachPalm(c, x, y) {
+    pRect(c, x + 2, y + 3, 78, 10, 'rgba(65,65,42,0.20)');
+    pOutlinedRect(c, x + 31, y - 103, 16, 108, '#896744');
+    for (let dy = -94; dy < -8; dy += 17) pRect(c, x + 34, y + dy, 10, 3, '#bb975f');
+    for (const [dx, dy, w] of [[-63, -119, 73], [43, -119, 74], [-51, -139, 66], [37, -139, 65], [-9, -153, 65]]) {
+        pRect(c, x + dx, y + dy, w, 13, '#37694d');
+        pRect(c, x + dx + 6, y + dy - 5, w - 14, 8, '#619a63');
+    }
+    pRect(c, x + 32, y - 163, 14, 53, '#54865b');
+}
+
+function drawVungTauHotel(c, x, y, w, h, wall, sign) {
+    pRect(c, x - 8, y + h - 10, w + 16, 20, 'rgba(41,48,45,0.24)');
+    pOutlinedRect(c, x, y, w, h, wall, '#55453a');
+    pRect(c, x + 8, y + 9, w - 16, 7, '#f2dfbd');
+    pRect(c, x + 10, y + 22, w - 20, 4, '#9b5d4c');
+    for (let row = 0; row < Math.floor((h - 56) / 31); row++) {
+        pRect(c, x + 9, y + 53 + row * 31, w - 18, 3, '#aa8a6c');
+        for (let wx = x + 15; wx < x + w - 22; wx += 33) {
+            pOutlinedRect(c, wx, y + 31 + row * 31, 23, 18, '#7da5a2', '#624b42');
+            pRect(c, wx + 10, y + 33 + row * 31, 2, 14, '#e8d7b6');
+        }
+    }
+    pOutlinedRect(c, x + 12, y + h - 40, w - 24, 27, '#456b72');
+    c.font = "bold 12px 'Chakra Petch', sans-serif";
+    c.fillStyle = '#fff2d6'; c.textAlign = 'center';
+    c.fillText(sign, x + w / 2, y + h - 21, w - 34);
+}
+
+function drawBeachUmbrella(c, x, y, color) {
+    pRect(c, x + 24, y + 36, 5, 37, '#8b7057');
+    pRect(c, x - 2, y + 69, 58, 5, 'rgba(65,65,42,0.18)');
+    pOutlinedRect(c, x - 15, y, 83, 26, color, '#4e5148');
+    pRect(c, x - 4, y + 5, 60, 5, '#f3e6c9');
+    pRect(c, x + 24, y + 2, 5, 23, '#f0d394');
+    for (let i = 0; i < 2; i++) {
+        const sx = x - 8 + i * 45;
+        pOutlinedRect(c, sx, y + 78, 25, 53, '#d9bd8d');
+        pRect(c, sx + 4, y + 83, 17, 37, '#f3e9ce');
+    }
+}
+
+function drawFishingMarketStall(c, x, y, awning, label) {
+    // Mái bạt sọc, cọc gỗ, mặt quầy và khay đá tạo nhịp riêng cho từng sạp.
+    pRect(c, x - 8, y + 67, 180, 9, 'rgba(46,47,39,0.24)');
+    for (const px of [x + 3, x + 157]) pOutlinedRect(c, px, y + 13, 8, 67, '#775638');
+    pOutlinedRect(c, x - 9, y + 4, 180, 25, awning, '#54463a');
+    for (let i = 0; i < 8; i += 2) pRect(c, x + i * 10, y + 6, 10, 21, '#f3e5c3');
+    pOutlinedRect(c, x, y + 43, 164, 28, '#9c704b');
+    pOutlinedRect(c, x + 9, y + 35, 145, 21, '#c4d9d2');
+    for (let i = 0; i < 5; i++) {
+        const bx = x + 15 + i * 26;
+        pOutlinedRect(c, bx, y + 38 + (i % 2) * 3, 20, 12, i % 2 ? '#7ba6a4' : '#d8a06a');
+        pRect(c, bx + 5, y + 42 + (i % 2) * 3, 9, 2, '#f4e2b1');
+    }
+    pOutlinedRect(c, x + 58, y - 21, 75, 22, '#fff0c8');
+    c.font = "bold 9px 'Chakra Petch', sans-serif";
+    c.fillStyle = '#573e2e'; c.textAlign = 'center';
+    c.fillText(label, x + 95, y - 6, 69);
+}
+
+function drawRoundLighthouse(c, x, y) {
+    // Tháp thuôn tròn, có ban công vòng, hai dải đỏ và chụp đèn kính.
+    pRect(c, x - 67, y + 251, 230, 19, 'rgba(38,45,41,0.24)');
+    pOutlinedRect(c, x - 32, y + 214, 161, 36, '#877c6b');
+    pRect(c, x - 22, y + 194, 141, 28, '#d7d0be');
+    c.fillStyle = '#50473f';
+    c.beginPath(); c.moveTo(x - 7, y + 206); c.lineTo(x + 17, y + 30); c.lineTo(x + 88, y + 30); c.lineTo(x + 111, y + 206); c.closePath(); c.fill();
+    c.fillStyle = '#f1e9d7';
+    c.beginPath(); c.moveTo(x + 1, y + 198); c.lineTo(x + 22, y + 39); c.lineTo(x + 82, y + 39); c.lineTo(x + 103, y + 198); c.closePath(); c.fill();
+    pRect(c, x + 4, y + 152, 96, 16, '#b64f43');
+    pRect(c, x + 9, y + 155, 86, 7, '#d86a53');
+    pRect(c, x + 12, y + 76, 81, 15, '#b64f43');
+    pRect(c, x + 16, y + 79, 73, 7, '#d86a53');
+    for (const wx of [x + 27, x + 70]) {
+        pOutlinedRect(c, wx, y + 109, 13, 28, '#52757a', '#695d50');
+        pRect(c, wx + 5, y + 112, 3, 21, '#b9d5cb');
+    }
+    pOutlinedRect(c, x + 2, y + 24, 102, 15, '#55463d');
+    pRect(c, x + 8, y + 27, 90, 8, '#f5eee0');
+    for (let i = 0; i < 15; i++) pRect(c, x + 7 + i * 6, y + 10, 2, 15, '#695a4a');
+    pOutlinedRect(c, x + 15, y - 20, 77, 34, '#4e514b');
+    pRect(c, x + 22, y - 14, 63, 21, '#eedb98');
+    pRect(c, x + 29, y - 12, 7, 17, '#f9f4d8');
+    pRect(c, x + 40, y - 12, 7, 17, '#f9f4d8');
+    pRect(c, x + 51, y - 12, 7, 17, '#f9f4d8');
+    pOutlinedRect(c, x + 8, y - 30, 91, 10, '#a64c40');
+    pOutlinedRect(c, x + 39, y - 43, 30, 13, '#615144');
+    pRect(c, x + 45, y - 51, 18, 8, '#615144');
+    pRect(c, x + 53, y - 66, 3, 15, '#615144');
+    // Cửa vòm chân tháp.
+    pOutlinedRect(c, x + 38, y + 166, 30, 40, '#705748');
+    pRect(c, x + 43, y + 172, 20, 34, '#31434a');
+    pRect(c, x + 51, y + 181, 3, 3, '#e2be67');
+}
+
+{
+    const zone = 'VUNGTAU_BAI_SAU';
+    const c = zoneCanvases[zone].getContext('2d');
+    drawVungTauCoast(c, zone);
+    // Phố nghỉ dưỡng nhiều tầng ở phía trong, mở tầm nhìn từ đường dạo ra biển.
+    drawVungTauHotel(c, 165, 176, 265, 246, '#f2d9b3', 'HẢI ÂU HOTEL');
+    drawVungTauHotel(c, 515, 213, 220, 209, '#d8e1cc', 'BÌNH MINH');
+    drawVungTauHotel(c, 1115, 163, 297, 259, '#e9c2a5', 'PHỐ BIỂN');
+    drawVungTauHotel(c, 1530, 226, 245, 196, '#d9d4b8', 'SÓNG XANH');
+    // Mái che cứu hộ, cờ bãi tắm, vòi tắm và ghế nghỉ nằm riêng trên nền cát.
+    pOutlinedRect(c, 874, 467, 250, 87, '#f4e4c1');
+    pOutlinedRect(c, 886, 479, 226, 63, '#487a82');
+    c.font = "bold 18px 'Chakra Petch', sans-serif"; c.fillStyle = '#fff4d8'; c.textAlign = 'center';
+    c.fillText('CỨU HỘ BÃI SAU', 999, 506);
+    c.font = "bold 11px 'Chakra Petch', sans-serif";
+    c.fillText('BÃI TẮM · PHỐ NGHỈ DƯỠNG', 999, 529);
+    addCollider(zone, 874, 467, 250, 87);
+    for (const [x, y, color] of [
+        [255, 842, '#d46c53'], [610, 930, '#4b8c99'], [850, 845, '#e1a74c'],
+        [1080, 930, '#4b8c99'], [1320, 852, '#e1a74c'], [1650, 963, '#c76d62']
+    ]) drawBeachUmbrella(c, x, y, color);
+    for (const [x, y] of [[403, 700], [1380, 700], [1780, 700]]) drawParkBench(c, x, y);
+    for (const [x, color] of [[90, '#e85c45'], [820, '#edc34d'], [1880, '#e85c45']]) {
+        pRect(c, x, 664, 3, 82, '#795a43'); pRect(c, x + 3, 666, 27, 20, color); pRect(c, x + 3, 686, 27, 4, '#fff1d1');
+    }
+    pOutlinedRect(c, 835, 702, 270, 34, '#467980');
+    c.font = "bold 15px 'Chakra Petch', sans-serif"; c.fillStyle = '#fff2d6'; c.textAlign = 'center';
+    c.fillText('BÃI SAU · VŨNG TÀU', 970, 725);
+}
+{
+    const zone = 'VUNGTAU_FISHING';
+    const c = zoneCanvases[zone].getContext('2d');
+    drawVungTauCoast(c, zone);
+    // Dãy nhà làng chài thấp phía sau chợ, mỗi căn có màu tường và mái khác nhau.
+    for (const [x, wall, roof] of [[185, '#e0c69d', '#a65c48'], [475, '#c7d3ba', '#687d70'], [1370, '#e8d3ae', '#bd7050'], [1650, '#d6c4a3', '#79745c']]) {
+        drawWeatheredWall(c, x, 265, 210, 131, wall, roof, '#f2dfbe');
+        drawTiledRoof(c, x - 7, 245, 224, 31, roof, '#53443c');
+        pOutlinedRect(c, x + 29, 306, 38, 38, '#88a5a0');
+        pOutlinedRect(c, x + 142, 306, 38, 38, '#88a5a0');
+        pOutlinedRect(c, x + 85, 346, 40, 50, '#705445');
+        addCollider(zone, x, 270, 210, 126);
+    }
+    // Chợ thành nhiều lối song song, mái bạt sọc và quầy bán nhìn thấy rõ từ xa.
+    drawFishingMarketStall(c, 228, 827, '#b54e45', 'CÁ TƯƠI');
+    drawFishingMarketStall(c, 468, 918, '#4f8190', 'HÀU · SÒ');
+    drawFishingMarketStall(c, 752, 827, '#cc8b3f', 'TÔM · MỰC');
+    drawFishingMarketStall(c, 1020, 918, '#4d7660', 'HẢI SẢN');
+    drawFishingMarketStall(c, 1290, 827, '#b45b58', 'CÁ KHÔ');
+    drawFishingMarketStall(c, 1550, 918, '#668b91', 'ĐÁ LẠNH');
+    // Bảng chợ lớn và lối gạch dẫn từ phố xuống phiên chợ.
+    pOutlinedRect(c, 815, 443, 375, 92, '#76523c');
+    pOutlinedRect(c, 824, 451, 357, 76, '#efe0b8');
+    c.font = "bold 22px 'Chakra Petch', sans-serif"; c.fillStyle = '#8b382e'; c.textAlign = 'center';
+    c.fillText('CHỢ CÁ LÀNG CHÀI', 1002, 482);
+    c.font = "bold 12px 'Chakra Petch', sans-serif"; c.fillStyle = '#59483a';
+    c.fillText('HẢI SẢN VỪA CẬP BẾN · MUA BÁN TỪ SÁNG SỚM', 1002, 507);
+    addCollider(zone, 815, 443, 375, 92);
+    for (let x = 930; x < 1080; x += 29) pRect(c, x, 540, 15, 42, '#e8d6b5');
+    // Thúng chai, lưới và thuyền gỗ nằm dọc bờ nước; chừa lối đi thông thoáng.
+    for (const [x, y, hull] of [[170, 1044, '#8a593a'], [540, 1060, '#b27646'], [1330, 1045, '#86533d'], [1710, 1060, '#b17643']]) {
+        pRect(c, x + 8, y + 26, 180, 8, 'rgba(35,49,49,0.22)');
+        pOutlinedRect(c, x, y, 188, 25, hull);
+        pRect(c, x + 14, y + 5, 155, 5, '#e4c38a');
+        pRect(c, x + 57, y - 12, 3, 18, '#684c39');
+        pRect(c, x + 60, y - 12, 34, 15, '#e6d6ae');
+        pRect(c, x + 42, y - 18, 65, 3, '#59483b');
+        for (let i = 0; i < 4; i++) pRect(c, x + 22 + i * 38, y + 27, 2, 13, '#72553c');
+    }
+    pOutlinedRect(c, 906, 887, 54, 30, '#b99462');
+    pRect(c, 913, 893, 40, 18, '#79a1a1');
+    pOutlinedRect(c, 1184, 887, 54, 30, '#b99462');
+    pRect(c, 1191, 893, 40, 18, '#e6d6ae');
+    pOutlinedRect(c, 1000, 1090, 124, 24, '#b99462');
+    for (const x of [1010, 1042, 1074]) pOutlinedRect(c, x, 1081, 22, 15, '#eee3c9');
+}
+{
+    const zone = 'VUNGTAU_LIGHTHOUSE';
+    const c = zoneCanvases[zone].getContext('2d');
+    drawVungTauCoast(c, zone, 'cliff');
+    // Mũi đất xanh xám nhô ra biển và đường dạo cong dẫn lên ngọn hải đăng.
+    pOutlinedRect(c, 575, 656, 1190, 390, '#8a9185');
+    pRect(c, 589, 670, 1160, 350, '#a9ae9b');
+    for (let x = 610; x < 1730; x += 77) {
+        pRect(c, x, 695 + (x % 5) * 11, 43, 8, '#79866e');
+        pRect(c, x + 18, 723 + (x % 3) * 13, 30, 6, '#c3b89b');
+    }
+    pOutlinedRect(c, 934, 594, 260, 80, '#e5d7ba');
+    pRect(c, 947, 605, 234, 58, '#c8b999');
+    for (let y = 612; y < 660; y += 12) pRect(c, 958, y, 211, 3, '#eee3ca');
+    // Lối bậc rộng uốn lên quảng trường, lan can sắt sơn trắng.
+    for (let i = 0; i < 7; i++) {
+        const x = 995 + i * 21, y = 988 - i * 42;
+        pOutlinedRect(c, x, y, 190, 39, i % 2 ? '#d8d1bd' : '#eee7d5');
+        pRect(c, x + 15, y + 8, 160, 3, '#bbb29e');
+    }
+    for (const x of [1008, 1164]) {
+        pRect(c, x, 737, 5, 250, '#f0ead8');
+        for (let y = 745; y < 990; y += 22) pRect(c, x - 3, y, 12, 4, '#f0ead8');
+    }
+    // Quảng trường ngắm biển, lan can và bảng tên địa danh trước chân tháp.
+    pOutlinedRect(c, 1070, 695, 315, 69, '#70695e');
+    pRect(c, 1080, 705, 295, 47, '#d6cbb3');
+    pOutlinedRect(c, 640, 790, 365, 47, '#71513a');
+    pOutlinedRect(c, 647, 797, 351, 33, '#f0d79e');
+    c.font = "bold 16px 'Chakra Petch', sans-serif"; c.fillStyle = '#713c31'; c.textAlign = 'center';
+    c.fillText('HẢI ĐĂNG VŨNG TÀU · 1862', 822, 819);
+    drawRoundLighthouse(c, 1090, 707);
+    addCollider(zone, 1082, 860, 128, 76);
+    // Ghế đá và vườn hoa dọc đường ngắm biển.
+    for (const x of [665, 826, 1460, 1640]) {
+        pRect(c, x, 900, 88, 9, '#7a7265'); pRect(c, x + 8, 909, 7, 26, '#61594f'); pRect(c, x + 74, 909, 7, 26, '#61594f');
+    }
+    for (const x of [720, 1535]) {
+        pOutlinedRect(c, x, 955, 112, 24, '#718b65');
+        for (let i = 0; i < 6; i++) pRect(c, x + 9 + i * 16, 947 + (i % 2) * 3, 7, 8, i % 3 ? '#d37675' : '#edca74');
+    }
+    // Sân phơi muối nhỏ ở rìa đường bờ, cạnh bao muối để có điểm gom nguyên liệu.
+    pOutlinedRect(c, 910, 1036, 210, 68, '#987d58');
+    pRect(c, 920, 1046, 190, 48, '#eee7d4');
+    for (let x = 930; x < 1100; x += 34) pRect(c, x, 1051, 23, 38, '#d5d0bd');
+    for (const [x, y] of [[928, 1090], [978, 1090], [1028, 1090]]) {
+        pOutlinedRect(c, x, y, 38, 42, '#e8ddc0'); pRect(c, x + 5, y + 7, 28, 24, '#f8f3e4');
+    }
 }
 for (const zid of ['VILLAS', 'CANAL_MARKET']) {
     const c = zoneCanvases[zid].getContext('2d');
@@ -4716,7 +5382,7 @@ function arriveByBus() {
     playerStats.hour = 19;
     yearTwo.travel = null;
     yearTwo.province = null;
-    switchZone('HOME_STREET', 1710, 1105, 'up');
+    switchZone(busTerminal.zone, busTerminal.arrivalX, busTerminal.arrivalY, 'up');
     let unpacked = 0;
     for (const [item, count] of Object.entries(yearTwo.bag)) {
         yearTwo.stocks[item] = (yearTwo.stocks[item] || 0) + count;
@@ -5605,10 +6271,10 @@ canvas.addEventListener('click', function (event) {
         if (route) departByBus(route);
         return;
     }
-    if (currentGameState === GAME_STATES.PLAYING_STREET && currentZone === 'HOME_STREET' && !indoorShop && !isAnyModalOpen()) {
+    if (currentGameState === GAME_STATES.PLAYING_STREET && currentZone === busTerminal.zone && !indoorShop && !isAnyModalOpen()) {
         const x = mouseX + Math.round(camera.x);
         const y = mouseY + Math.round(camera.y);
-        if (x >= parkedBus.x && x <= parkedBus.x + parkedBus.w && y >= parkedBus.y && y <= parkedBus.y + parkedBus.h) {
+        if (terminalBuses.some(bus => x >= bus.x && x <= bus.x + bus.w && y >= bus.y && y <= bus.y + bus.h)) {
             triggerInteractable({ type: 'BUS' });
             return;
         }
@@ -6325,6 +6991,11 @@ function updateStreet() {
     const zoneCfg = GAME_CONFIG.ZONES[currentZone];
     const conn = zoneCfg ? zoneCfg.connections : {};
     const colliders = [...(zoneColliders[currentZone] || [])];
+    if (currentZone === busTerminal.zone) {
+        for (const bus of terminalBuses) {
+            colliders.push({ x: bus.x, y: bus.y + 14, w: bus.w, h: bus.h - 14, dynamic: true });
+        }
+    }
     if (coffeeCart.zone === currentZone && !coffeeCart.isPushed) {
         colliders.push({ x: coffeeCart.x + 4, y: coffeeCart.y + 8, w: 80, h: 40, dynamic: true });
     }
@@ -6343,9 +7014,6 @@ function updateStreet() {
     updatePlayerMovement(16, WORLD_W - 16, 40, WORLD_H - 40, colliders);
     updateCamera(false);
 
-    if (currentZone === 'HOME_STREET' && Math.hypot(player.x - 1710, player.y - 1030) < 100) {
-        nearbyInteractable = { type: 'BUS', label: '🚌 Bến xe liên tỉnh · [E] Đi Đà Lạt · Vé 200.000đ' };
-    }
     if (currentZone === 'HOME_STREET' && Math.hypot(player.x - 900, player.y - 900) < 70 && playerStats.dayOfYear >= 75 && !yearTwo.backpack) {
         nearbyInteractable = { type: 'BACKPACK', label: '🎒 Ba lô Cô Ba · [E] Mua 250.000đ' };
     }
@@ -6483,7 +7151,8 @@ function updateStreet() {
         nearbyInteractable = { type: 'WEDDING', label: `💍 Lễ cưới với ${engagedNPC.name} · [E] Cử hành` };
     }
 
-    if (!nearbyInteractable && currentZone === 'HOME_STREET' && Math.hypot(player.x - 1710, player.y - 1030) < 100) {
+    if (!nearbyInteractable && currentZone === busTerminal.zone &&
+        terminalBuses.some(bus => Math.hypot(player.x + 18 - (bus.x + bus.w / 2), player.y + 24 - (bus.y + bus.h / 2)) < 115)) {
         nearbyInteractable = { type: 'BUS', label: 'Bấm vào xe khách hoặc nhấn [E] để chọn tuyến' };
     }
     if (!nearbyInteractable && currentZone === 'HOME_STREET' && Math.hypot(player.x - 900, player.y - 900) < 70 && playerStats.dayOfYear >= 75 && !yearTwo.backpack) {
@@ -6491,15 +7160,15 @@ function updateStreet() {
     }
     if (!nearbyInteractable) {
         const pickup = [
-            { zone: 'DALAT_GREENHOUSE', x: 1015, y: 900, item: 'flowers', name: 'hoa tươi Đà Lạt', icon: '🌷' },
-            { zone: 'DALAT_GREENHOUSE', x: 760, y: 520, item: 'strawberries', name: 'dâu tây Đà Lạt', icon: '🍓' },
-            { zone: 'DALAT_GREENHOUSE', x: 1260, y: 520, item: 'arabica', name: 'Arabica Đà Lạt', icon: '☕' },
+            { zone: 'DALAT_GREENHOUSE', x: 1112, y: 1101, item: 'flowers', name: 'hoa tươi Đà Lạt', icon: '🌷' },
+            { zone: 'DALAT_GREENHOUSE', x: 760, y: 1000, item: 'strawberries', name: 'dâu tây Đà Lạt', icon: '🍓' },
+            { zone: 'DALAT_GREENHOUSE', x: 1260, y: 1000, item: 'arabica', name: 'Arabica Đà Lạt', icon: '☕' },
             { zone: 'MEKONG_FLOATING', x: 1015, y: 900, item: 'seafood', name: 'hải sản sông', icon: '🦐' },
-            { zone: 'MEKONG_FLOATING', x: 760, y: 520, item: 'coconut', name: 'dừa miền Tây', icon: '🥥' },
+            { zone: 'MEKONG_FLOATING', x: 760, y: 900, item: 'coconut', name: 'dừa miền Tây', icon: '🥥' },
             { zone: 'MEKONG_CRAFT', x: 1015, y: 900, item: 'silk', name: 'lụa miền Tây', icon: '🧵' },
-            { zone: 'VUNGTAU_FISHING', x: 1015, y: 900, item: 'oysters', name: 'hàu biển Vũng Tàu', icon: '🦪' },
-            { zone: 'VUNGTAU_FISHING', x: 760, y: 520, item: 'seafood', name: 'hải sản biển', icon: '🦐' },
-            { zone: 'VUNGTAU_LIGHTHOUSE', x: 1015, y: 900, item: 'seaSalt', name: 'muối biển', icon: '🧂' }
+            { zone: 'VUNGTAU_FISHING', x: 1092, y: 900, item: 'oysters', name: 'hàu biển Vũng Tàu', icon: '🦪' },
+            { zone: 'VUNGTAU_FISHING', x: 817, y: 900, item: 'seafood', name: 'hải sản biển', icon: '🦐' },
+            { zone: 'VUNGTAU_LIGHTHOUSE', x: 1015, y: 1070, item: 'seaSalt', name: 'muối biển', icon: '🧂' }
         ].find((spot) => spot.zone === currentZone && Math.hypot(player.x - spot.x, player.y - spot.y) < 110);
         if (pickup) nearbyInteractable = { type: 'SPECIALTY', item: pickup.item, name: pickup.name, icon: pickup.icon, label: `${pickup.icon} ${pickup.name} · [E] Gom tối đa 2` };
     }
@@ -6532,11 +7201,13 @@ function updateStreet() {
 
     // Chuyển khu vực qua 4 mép bản đồ 2000x1400
     if (player.x <= 24 && (keys.a || keys.ArrowLeft) && conn.left) {
-        switchZone(conn.left, WORLD_W - 85, player.y, 'left');
+        const entryY = conn.left === 'DALAT_PINE' ? 600 : (currentZone === 'DALAT_PINE' ? 965 : player.y);
+        switchZone(conn.left, WORLD_W - 85, entryY, 'left');
         return;
     }
     if (player.x >= WORLD_W - player.size - 24 && (keys.d || keys.ArrowRight) && conn.right) {
-        switchZone(conn.right, 45, player.y, 'right');
+        const entryY = conn.right === 'DALAT_PINE' ? 600 : (currentZone === 'DALAT_PINE' ? 965 : player.y);
+        switchZone(conn.right, 45, entryY, 'right');
         return;
     }
     if (player.y <= 55 && (keys.w || keys.ArrowUp) && conn.up) {
@@ -7906,8 +8577,42 @@ const MAP_NODES = [
     { id: 'DISTRICT_1', label: 'QUẬN 1 (PHỐ ĐÊM)', sub: 'Giá bán x2.1', x: 430, y: 415, w: 165, h: 74 },
     { id: 'ELDERLY_AREA', label: 'KHU NGƯỜI GIÀ', sub: 'Giá bán x1.6', x: 660, y: 120, w: 165, h: 72 },
     { id: 'PARK', label: 'CÔNG VIÊN', sub: 'Giá bán x1.4', x: 660, y: 265, w: 165, h: 74 },
-    { id: 'BREEZE_AREA', label: 'KHU ĐÓN GIÓ', sub: 'Giá bán x1.5', x: 660, y: 415, w: 165, h: 74 }
+    { id: 'BREEZE_AREA', label: 'KHU ĐÓN GIÓ', sub: 'Bến xe liên tỉnh', x: 660, y: 415, w: 165, h: 74 }
 ];
+
+const PROVINCE_MAPS = {
+    VUNGTAU: {
+        title: 'VŨNG TÀU · TUYẾN VEN BIỂN',
+        nodes: [
+            { id: 'VUNGTAU_BAI_SAU', label: 'BÃI SAU', sub: 'Bãi tắm · Phố nghỉ dưỡng', x: 88, y: 256, w: 250, h: 104 },
+            { id: 'VUNGTAU_FISHING', label: 'CHỢ CÁ LÀNG CHÀI', sub: 'Phiên chợ · Hải sản tươi', x: 375, y: 256, w: 250, h: 104 },
+            { id: 'VUNGTAU_LIGHTHOUSE', label: 'HẢI ĐĂNG & MŨI ĐÁ', sub: 'Ngọn hải đăng · Ngắm biển', x: 662, y: 256, w: 250, h: 104 }
+        ]
+    },
+    DALAT: {
+        title: 'ĐÀ LẠT · BA ĐIỂM ĐẾN',
+        nodes: [
+            { id: 'DALAT_NIGHT', label: 'CHỢ ĐÊM & PHỐ DỐC', sub: 'Chợ đêm · Mặt bằng', x: 88, y: 256, w: 250, h: 104 },
+            { id: 'DALAT_GREENHOUSE', label: 'THUNG LŨNG NHÀ KÍNH', sub: 'Dâu tây · Hoa · Arabica', x: 375, y: 256, w: 250, h: 104 },
+            { id: 'DALAT_PINE', label: 'ĐỒI THÔNG & GA CỔ', sub: 'Nhà ga · Biệt thự · Rừng thông', x: 662, y: 256, w: 250, h: 104 }
+        ]
+    },
+    MEKONG: {
+        title: 'MIỀN TÂY · BA ĐIỂM ĐẾN',
+        nodes: [
+            { id: 'MEKONG_QUAY', label: 'BẾN NINH KIỀU', sub: 'Bến tàu · Phố ven sông', x: 88, y: 256, w: 250, h: 104 },
+            { id: 'MEKONG_FLOATING', label: 'CHỢ NỔI MIỆT VƯỜN', sub: 'Ghe hàng · Cây bẹo', x: 375, y: 256, w: 250, h: 104 },
+            { id: 'MEKONG_CRAFT', label: 'LÀNG NGHỀ VEN RẠCH', sub: 'Dệt lụa · Đan lát', x: 662, y: 256, w: 250, h: 104 }
+        ]
+    }
+};
+
+function getCurrentProvinceMap() {
+    if (currentZone.startsWith('VUNGTAU_')) return PROVINCE_MAPS.VUNGTAU;
+    if (currentZone.startsWith('DALAT_')) return PROVINCE_MAPS.DALAT;
+    if (currentZone.startsWith('MEKONG_')) return PROVINCE_MAPS.MEKONG;
+    return null;
+}
 
 function drawNPCSchedulePanel() {
     const phase = getNPCSchedulePhase();
@@ -7978,6 +8683,42 @@ function drawMapModal() {
     pOutlinedRect(ctx, 35, 45, 930, 545, "#ecd3ab");
     pOutlinedRect(ctx, 45, 55, 910, 525, "#fff6e5");
 
+    const provinceMap = currentGameState === GAME_STATES.PLAYING_STREET ? getCurrentProvinceMap() : null;
+    if (provinceMap) {
+        ctx.fillStyle = PAL.OUTLINE;
+        ctx.font = "bold 23px 'Chakra Petch', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(`🗺️ ${provinceMap.title}`, canvas.width / 2, 111);
+        ctx.strokeStyle = '#6c5542';
+        ctx.lineWidth = 7;
+        ctx.beginPath();
+        ctx.moveTo(338, 308); ctx.lineTo(375, 308);
+        ctx.moveTo(625, 308); ctx.lineTo(662, 308);
+        ctx.stroke();
+        for (const node of provinceMap.nodes) {
+            const isHere = currentZone === node.id;
+            pOutlinedRect(ctx, node.x, node.y, node.w, node.h, isHere ? '#f0b643' : '#ecd3ab');
+            pOutlinedRect(ctx, node.x + 5, node.y + 5, node.w - 10, node.h - 10, isHere ? '#c84b31' : '#fffdf9');
+            ctx.fillStyle = isHere ? '#ffffff' : PAL.OUTLINE;
+            ctx.font = "bold 15px 'Chakra Petch', sans-serif";
+            ctx.fillText(node.label, node.x + node.w / 2, node.y + 44);
+            ctx.fillStyle = isHere ? '#f0b643' : '#963420';
+            ctx.font = "bold 12px 'Chakra Petch', sans-serif";
+            ctx.fillText(node.sub, node.x + node.w / 2, node.y + 72);
+            if (isHere) {
+                ctx.fillStyle = '#2ecc71'; ctx.font = "bold 11px 'Chakra Petch', sans-serif";
+                ctx.fillText('★ BẠN ĐANG Ở ĐÂY', node.x + node.w / 2, node.y - 10);
+            }
+        }
+        pOutlinedRect(ctx, 845, 68, 92, 34, '#c84b31');
+        ctx.fillStyle = '#ffffff'; ctx.font = "bold 13px 'Chakra Petch', sans-serif";
+        ctx.fillText('ĐÓNG [M]', 891, 90);
+        ctx.fillStyle = PAL.OUTLINE; ctx.font = "bold 14px 'Chakra Petch', sans-serif";
+        ctx.fillText('Ba khu nối liền theo một trục ngang. Đi bộ sang khu bên cạnh bằng phím A / D.', canvas.width / 2, 500);
+        ctx.fillText('Sơ đồ chỉ cho chuyển nhanh bên trong tỉnh trong ngày xe khách.', canvas.width / 2, 530);
+        return;
+    }
+
     ctx.fillStyle = PAL.OUTLINE;
     ctx.font = "bold 22px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
@@ -8042,6 +8783,19 @@ function drawMapModal() {
 function handleMapModalClick(mx, my) {
     if (mx >= 845 && mx <= 937 && my >= 68 && my <= 102) {
         showMapModal = false;
+        return;
+    }
+    const provinceMap = currentGameState === GAME_STATES.PLAYING_STREET ? getCurrentProvinceMap() : null;
+    if (provinceMap) {
+        for (const node of provinceMap.nodes) {
+            if (mx >= node.x && mx <= node.x + node.w && my >= node.y && my <= node.y + node.h) {
+                showMapModal = false;
+                currentGameState = GAME_STATES.PLAYING_STREET;
+                const isDalatPine = node.id === 'DALAT_PINE';
+                switchZone(node.id, isDalatPine ? 1400 : 970, isDalatPine ? 600 : 965, 'down');
+                return;
+            }
+        }
         return;
     }
     for (const node of MAP_NODES) {
@@ -8349,12 +9103,62 @@ function drawBreezeSeasonDecorations() {
     }
 }
 
+function drawVungTauMarketKeepers() {
+    const vendors = [
+        { x: 335, y: 903, shirt: '#d97559', hair: '#31251f', gender: 1, name: 'Cô bán cá' },
+        { x: 594, y: 989, shirt: '#658d70', hair: '#29221d', gender: 0, name: 'Chú bán hàu' },
+        { x: 858, y: 903, shirt: '#e0a34c', hair: '#33231a', gender: 1, name: 'Dì bán tôm' },
+        { x: 1128, y: 989, shirt: '#4f8290', hair: '#342822', gender: 0, name: 'Bác bán cá' },
+        { x: 1426, y: 903, shirt: '#b85e55', hair: '#30231d', gender: 1, name: 'Cô bán cá khô' },
+        { x: 1685, y: 989, shirt: '#778c64', hair: '#392b20', gender: 0, name: 'Chú chở đá' }
+    ];
+    for (const vendor of vendors) {
+        const config = {
+            genderIndex: vendor.gender,
+            look: [1.05, 1.05, 'crop', vendor.hair, 1, 'tie', 'shirt', vendor.shirt, '#43534d'],
+            outfitIndex: 0,
+            outfits: [{ color: vendor.shirt, shadow: '#554b42', shorts: '#343a3c' }],
+            accessoryIndex: 0,
+            accessories: [{ type: 'cap' }]
+        };
+        drawBitmapCharacter(vendor.x, vendor.y, config, 'down', 0, false, 1.08);
+        ctx.font = "bold 9px 'Chakra Petch', sans-serif";
+        ctx.textAlign = 'center';
+        const tagWidth = ctx.measureText(vendor.name).width + 10;
+        pOutlinedRect(ctx, vendor.x + 18 - tagWidth / 2, vendor.y - 14, tagWidth, 15, '#fff0c8');
+        ctx.fillStyle = '#5c4130';
+        ctx.fillText(vendor.name, vendor.x + 18, vendor.y - 3);
+    }
+}
+
 function drawZoneAmbientEffectsInWorld() {
+    if (currentZone.startsWith('VUNGTAU_')) {
+        const phase = tickCount * 0.035;
+        for (let x = -40; x < WORLD_W; x += 96) {
+            const y = 1118 + Math.round(Math.sin(phase + x * 0.008) * 6);
+            pRect(ctx, x, y, 85, 5, 'rgba(247,252,224,0.85)');
+            pRect(ctx, x + 24, y + 50, 46, 3, 'rgba(213,246,226,0.55)');
+        }
+        if (currentZone === 'VUNGTAU_LIGHTHOUSE' && playerStats.hour >= 18) {
+            const pulse = 0.18 + (Math.sin(tickCount * 0.06) + 1) * 0.07;
+            ctx.save();
+            ctx.globalAlpha = pulse;
+            ctx.fillStyle = '#ffe8a5';
+            ctx.beginPath();
+            ctx.moveTo(1150, 666); ctx.lineTo(15, 554); ctx.lineTo(15, 612); ctx.closePath(); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(1150, 666); ctx.lineTo(1990, 730); ctx.lineTo(1990, 786); ctx.closePath(); ctx.fill();
+            ctx.restore();
+        }
+    }
+
     if (currentZone === 'BREEZE_AREA') {
         const waveOffset = Math.sin(tickCount * 0.05) * 10;
         pRect(ctx, 0, 836 + waveOffset * 0.4, WORLD_W, 5, "rgba(255, 255, 255, 0.75)");
         drawBreezeSeasonDecorations();
         breezeCyclists.forEach((cy) => drawBicycleRider(cy));
+    } else if (currentZone === 'VUNGTAU_FISHING') {
+        drawVungTauMarketKeepers();
     } else if (currentZone === 'ELDERLY_AREA') {
         const elder1 = {
             genderIndex: 0, outfitIndex: 0,
@@ -8594,15 +9398,12 @@ function drawStreet() {
     ctx.translate(-Math.round(camera.x), -Math.round(camera.y));
 
     ctx.drawImage(bg, 0, 0);
-    if (currentZone === 'HOME_STREET') {
-        pOutlinedRect(ctx, 1640, 970, 150, 105, '#d8c4a2');
-        pOutlinedRect(ctx, 1652, 982, 126, 26, '#c84b31');
-        ctx.fillStyle = '#fff3d6'; ctx.textAlign = 'center'; ctx.font = "bold 14px 'Chakra Petch', sans-serif";
-        ctx.fillText('BẾN XE 5AM', 1715, 1001);
-        drawPassengerBus(parkedBus.x, parkedBus.y, 1);
+    if (currentZone === busTerminal.zone) {
+        for (const bus of terminalBuses) drawPassengerBus(bus.x, bus.y, 1);
     }
-    if (['DALAT_GREENHOUSE', 'MEKONG_FLOATING', 'MEKONG_CRAFT'].includes(currentZone)) {
-        const title = currentZone === 'DALAT_GREENHOUSE' ? 'VƯỜN ĐẶC SẢN ĐÀ LẠT' : currentZone === 'MEKONG_FLOATING' ? 'CHỢ NỔI MIỆT VƯỜN' : currentZone === 'MEKONG_CRAFT' ? 'SẠP LỤA THỦ CÔNG' : currentZone === 'VUNGTAU_FISHING' ? 'CHỢ CÁ VŨNG TÀU' : 'HẢI ĐĂNG VŨNG TÀU';
+
+    if (['MEKONG_FLOATING', 'MEKONG_CRAFT'].includes(currentZone)) {
+        const title = currentZone === 'MEKONG_FLOATING' ? 'CHỢ NỔI MIỆT VƯỜN' : 'SẠP LỤA THỦ CÔNG';
         pOutlinedRect(ctx, 900, 850, 230, 100, '#846f4a');
         ctx.fillStyle = '#fff3d6'; ctx.textAlign = 'center'; ctx.font = "bold 14px 'Chakra Petch', sans-serif";
         ctx.fillText(title, 1015, 890);
@@ -9376,7 +10177,48 @@ if (YEAR_TWO_PREVIEW) {
     yearTwo.backpack = true;
     confirmStartNextDay();
     currentGameState = GAME_STATES.PLAYING_STREET;
-    switchZone('HOME_STREET', 1710, 1105, 'up');
+    switchZone(busTerminal.zone, busTerminal.arrivalX, busTerminal.arrivalY, 'up');
+    if (new URLSearchParams(location.search).get('zone') === 'vungtau') {
+        yearTwo.showTrailer = false;
+        yearTwo.destination = 'VUNGTAU';
+        yearTwo.province = 'VUNGTAU';
+        yearTwo.travel = 'outbound';
+        playerStats.hour = 10;
+        switchZone('VUNGTAU_BAI_SAU', 970, 965, 'down');
+    }
+    if (new URLSearchParams(location.search).get('zone') === 'breeze') {
+        yearTwo.showTrailer = false;
+        switchZone('BREEZE_AREA', 470, 410, 'up');
+    }
+    const dalatPreviewZones = {
+        dalat: 'DALAT_NIGHT',
+        'dalat-greenhouse': 'DALAT_GREENHOUSE',
+        'dalat-pine': 'DALAT_PINE'
+    };
+    const dalatPreviewZone = dalatPreviewZones[new URLSearchParams(location.search).get('zone')];
+    if (dalatPreviewZone) {
+        yearTwo.showTrailer = false;
+        yearTwo.destination = 'DALAT';
+        yearTwo.province = 'DALAT';
+        yearTwo.travel = 'outbound';
+        playerStats.hour = 10;
+        const landmarkPreview = dalatPreviewZone === 'DALAT_PINE';
+        switchZone(dalatPreviewZone, landmarkPreview ? 1400 : 970, landmarkPreview ? 600 : 965, 'down');
+    }
+    const mekongPreviewZones = {
+        mekong: 'MEKONG_QUAY',
+        'mekong-floating': 'MEKONG_FLOATING',
+        'mekong-craft': 'MEKONG_CRAFT'
+    };
+    const mekongPreviewZone = mekongPreviewZones[new URLSearchParams(location.search).get('zone')];
+    if (mekongPreviewZone) {
+        yearTwo.showTrailer = false;
+        yearTwo.destination = 'MEKONG';
+        yearTwo.province = 'MEKONG';
+        yearTwo.travel = 'outbound';
+        playerStats.hour = 10;
+        switchZone(mekongPreviewZone, 970, 965, 'down');
+    }
 }
 
 requestAnimationFrame(gameLoop);

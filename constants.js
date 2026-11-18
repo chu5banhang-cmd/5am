@@ -244,15 +244,15 @@ const GAME_CONFIG = {
             priceRange: '14 Triệu/tháng',
             priceMultiplier: 1.5
         },
-        DALAT_NIGHT: { id: 'DALAT_NIGHT', name: 'Đà Lạt · Chợ Đêm & Phố Dốc', subtitle: 'Bến xe · Mặt bằng · Thương lái', connections: { right: 'DALAT_GREENHOUSE', up: 'DALAT_PINE' }, priceMultiplier: 1.35 },
-        DALAT_GREENHOUSE: { id: 'DALAT_GREENHOUSE', name: 'Đà Lạt · Thung Lũng Nhà Kính', subtitle: 'Vùng nguyên liệu · Hoa tươi', connections: { left: 'DALAT_NIGHT', up: 'DALAT_PINE' }, priceMultiplier: 1.25 },
-        DALAT_PINE: { id: 'DALAT_PINE', name: 'Đà Lạt · Đồi Thông & Biệt Thự Cổ', subtitle: 'Lễ hội mùa hoa · Nghệ sĩ · Hợp đồng', connections: { down: 'DALAT_NIGHT' }, priceMultiplier: 1.5 },
-        MEKONG_QUAY: { id: 'MEKONG_QUAY', name: 'Miền Tây · Bến Ninh Kiều', subtitle: 'Bến xe · Mặt bằng ven sông', connections: { right: 'MEKONG_FLOATING', up: 'MEKONG_CRAFT' }, priceMultiplier: 1.4 },
-        MEKONG_FLOATING: { id: 'MEKONG_FLOATING', name: 'Miền Tây · Chợ Nổi & Miệt Vườn', subtitle: 'Hải sản sông · Dừa · Trái cây', connections: { left: 'MEKONG_QUAY', up: 'MEKONG_CRAFT' }, priceMultiplier: 1.3 },
-        MEKONG_CRAFT: { id: 'MEKONG_CRAFT', name: 'Miền Tây · Làng Nghề', subtitle: 'Vải lụa · Thổ cẩm', connections: { down: 'MEKONG_QUAY' }, priceMultiplier: 1.25 },
-        VUNGTAU_BAI_SAU: { id: 'VUNGTAU_BAI_SAU', name: 'Vũng Tàu · Bãi Sau & Phố Biển', subtitle: 'Bến xe · Mặt bằng · Khách du lịch', connections: { right: 'VUNGTAU_FISHING', up: 'VUNGTAU_LIGHTHOUSE' }, priceMultiplier: 1.45 },
-        VUNGTAU_FISHING: { id: 'VUNGTAU_FISHING', name: 'Vũng Tàu · Chợ Cá & Làng Chài', subtitle: 'Hải sản biển · Hàu tươi', connections: { left: 'VUNGTAU_BAI_SAU', up: 'VUNGTAU_LIGHTHOUSE' }, priceMultiplier: 1.3 },
-        VUNGTAU_LIGHTHOUSE: { id: 'VUNGTAU_LIGHTHOUSE', name: 'Vũng Tàu · Hải Đăng & Mũi Nghinh Phong', subtitle: 'Muối biển · Cảnh quan · Hợp đồng du lịch', connections: { down: 'VUNGTAU_BAI_SAU' }, priceMultiplier: 1.4 }
+        DALAT_NIGHT: { id: 'DALAT_NIGHT', name: 'Đà Lạt · Chợ Đêm & Phố Dốc', subtitle: 'Chợ đêm · Bậc dốc · Mặt bằng', connections: { right: 'DALAT_GREENHOUSE' }, priceMultiplier: 1.35 },
+        DALAT_GREENHOUSE: { id: 'DALAT_GREENHOUSE', name: 'Đà Lạt · Thung Lũng Nhà Kính', subtitle: 'Nhà kính · Dâu tây · Hoa tươi', connections: { left: 'DALAT_NIGHT', right: 'DALAT_PINE' }, priceMultiplier: 1.25 },
+        DALAT_PINE: { id: 'DALAT_PINE', name: 'Đà Lạt · Đồi Thông & Ga Cổ', subtitle: 'Nhà ga cổ · Đồi thông · Biệt thự', connections: { left: 'DALAT_GREENHOUSE' }, priceMultiplier: 1.5 },
+        MEKONG_QUAY: { id: 'MEKONG_QUAY', name: 'Miền Tây · Bến Ninh Kiều', subtitle: 'Bến tàu · Phố ven sông', connections: { right: 'MEKONG_FLOATING' }, priceMultiplier: 1.4 },
+        MEKONG_FLOATING: { id: 'MEKONG_FLOATING', name: 'Miền Tây · Chợ Nổi & Miệt Vườn', subtitle: 'Ghe hàng · Cây bẹo · Vườn trái cây', connections: { left: 'MEKONG_QUAY', right: 'MEKONG_CRAFT' }, priceMultiplier: 1.3 },
+        MEKONG_CRAFT: { id: 'MEKONG_CRAFT', name: 'Miền Tây · Làng Nghề Ven Rạch', subtitle: 'Khung dệt · Đan lát · Kẹo dừa', connections: { left: 'MEKONG_FLOATING' }, priceMultiplier: 1.25 },
+        VUNGTAU_BAI_SAU: { id: 'VUNGTAU_BAI_SAU', name: 'Vũng Tàu · Bãi Sau & Phố Biển', subtitle: 'Bãi cát · Khách du lịch · Phố nghỉ dưỡng', connections: { right: 'VUNGTAU_FISHING' }, priceMultiplier: 1.45 },
+        VUNGTAU_FISHING: { id: 'VUNGTAU_FISHING', name: 'Vũng Tàu · Chợ Cá & Làng Chài', subtitle: 'Phiên chợ sáng · Thuyền thúng · Hải sản', connections: { left: 'VUNGTAU_BAI_SAU', right: 'VUNGTAU_LIGHTHOUSE' }, priceMultiplier: 1.3 },
+        VUNGTAU_LIGHTHOUSE: { id: 'VUNGTAU_LIGHTHOUSE', name: 'Vũng Tàu · Hải Đăng & Mũi Nghinh Phong', subtitle: 'Ngọn hải đăng · Mũi đá · Đường ven biển', connections: { left: 'VUNGTAU_FISHING' }, priceMultiplier: 1.4 }
     },
 
     // Danh sách mặt bằng cho thuê tại từng khu vực (tọa độ thoáng đãng trên bản đồ 2000x1400 kiểu Stardew Valley)
@@ -398,7 +398,7 @@ const GAME_CONFIG = {
                 traffic: '★★★★☆',
                 customerType: 'Người đạp xe thể thao sáng sớm, giới trẻ ra bờ kè hóng gió biển',
                 desc: 'Không gian mở đón trọn làn gió biển mát rượi, sát cạnh đường đạp xe ven biển.',
-                x: 560, y: 220, w: 225, h: 170, doorX: 672, doorY: 410
+                x: 1110, y: 220, w: 225, h: 170, doorX: 1222, doorY: 410
 
             }
         ]
