@@ -547,3 +547,59 @@ body.is-mobile.is-landscape .touch-btn-sub {
     padding: 7px 10px;
     font-size: 12px;
 }
+
+/* Keep touch controls compact on phones so they leave the playfield visible. */
+body.is-mobile.is-landscape .mobile-topbar {
+    gap: 4px;
+    padding-top: max(2px, env(safe-area-inset-top, 2px));
+    padding-right: max(4px, env(safe-area-inset-right, 4px));
+}
+
+body.is-mobile.is-landscape .touch-chip {
+    padding: 4px 7px;
+    font-size: clamp(10px, 2.2vh, 12px);
+}
+
+body.is-mobile.is-landscape .mobile-pad-row {
+    gap: 6px;
+    padding-right: max(4px, env(safe-area-inset-right, 4px));
+    padding-left: max(4px, env(safe-area-inset-left, 4px));
+}
+
+body.is-mobile.is-landscape #touchJoystick {
+    width: clamp(72px, 15vh, 100px);
+    height: clamp(72px, 15vh, 100px);
+}
+
+body.is-mobile.is-landscape #touchJoystickKnob {
+    width: 40px;
+    height: 40px;
+    margin-top: -20px;
+    margin-left: -20px;
+}
+
+body.is-mobile.is-landscape .action-cluster {
+    max-width: min(42vw, 300px);
+    gap: 5px;
+}
+
+body.is-mobile.is-landscape .action-secondary-row,
+body.is-mobile.is-landscape .action-primary-row {
+    gap: 5px;
+}
+
+body.is-mobile.is-landscape .touch-btn-main {
+    min-width: 0;
+    padding: 7px 9px;
+    font-size: clamp(11px, 2.4vh, 13px);
+}
+
+body.is-mobile.is-landscape .touch-btn-close {
+    padding: 6px 9px;
+    font-size: clamp(10px, 2.2vh, 12px);
+}
+
+body.is-mobile.is-landscape .touch-btn-sub {
+    padding: 5px 7px;
+    font-size: clamp(10px, 2.1vh, 11px);
+}
