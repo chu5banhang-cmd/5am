@@ -34,7 +34,7 @@ const GAME_CONFIG = {
             icon: '☀️',
             outdoorCartCooldownMult: 1.0,
             indoorShopCooldownMult: 1.0,
-            preferredDrink: 'caphe_sua',
+            preferredDrink: 'ca_phe_sua',
             desc: 'Trời quang đãng, khách dạo phố đều đặn.'
         },
         HOT: {
@@ -52,7 +52,7 @@ const GAME_CONFIG = {
             icon: '🌧️',
             outdoorCartCooldownMult: 1.65,
             indoorShopCooldownMult: 0.90,
-            preferredDrink: 'caphe_den',
+            preferredDrink: 'ca_phe_den',
             desc: 'Mưa Sài Gòn bất chợt! Xe vỉa hè vắng hơn, quán có mái che vẫn ổn.'
         },
         STORM: {
@@ -61,7 +61,7 @@ const GAME_CONFIG = {
             icon: '⛈️',
             outdoorCartCooldownMult: 2.6,
             indoorShopCooldownMult: 1.15,
-            preferredDrink: 'tra_dao',
+            preferredDrink: 'tra_cam_sa',
             desc: 'Gió giật mưa to! Khách ngại đứng ngoài trời, chỉ vào quán trú mưa.'
         }
     },

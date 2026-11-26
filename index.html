@@ -2,53 +2,93 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>5AM - Khởi Nghiệp Cà Phê Hẻm Sài Gòn (Pixel 2D Top-Down)</title>
     <!-- Font chữ phong cách Pixel / Retro hỗ trợ đầy đủ tiếng Việt -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=VT323&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=guide-2">
 </head>
 <body>
 
-    <div class="game-container">
-        <canvas id="gameCanvas" width="1000" height="650"></canvas>
-        <div id="playerFormFields">
-            <div class="player-field">
-                <label for="playerNameInput">Tên chủ quán</label>
-                <input type="text" id="playerNameInput" placeholder="Nhập tên..." maxlength="14" value="Chủ Quán" spellcheck="false" autocomplete="off">
+    <div id="appShell">
+        <div class="game-container" id="gameContainer">
+            <canvas id="gameCanvas" width="1000" height="650"></canvas>
+            <div id="playerFormFields">
+                <div class="player-field">
+                    <label for="playerNameInput">Tên chủ quán</label>
+                    <input type="text" id="playerNameInput" placeholder="Nhập tên..." maxlength="14" value="Chủ Quán" spellcheck="false" autocomplete="off">
+                </div>
+                <div id="playerBirthdayField" hidden>
+                    <label for="playerBirthdayInput">Ngày sinh <span>(1–100)</span></label>
+                    <input type="number" id="playerBirthdayInput" min="1" max="100" step="1" value="1" required>
+                </div>
             </div>
-            <div id="playerBirthdayField" hidden>
-                <label for="playerBirthdayInput">Ngày sinh <span>(1–100)</span></label>
-                <input type="number" id="playerBirthdayInput" min="1" max="100" step="1" value="1" required>
+            <div id="authModal" hidden>
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <span>👤 TÀI KHOẢN CLOUD 5AM</span>
+                        <button type="button" id="authCloseBtn">✖</button>
+                    </div>
+                    <div class="auth-tabs">
+                        <button type="button" id="authTabLogin" class="active">ĐĂNG NHẬP</button>
+                        <button type="button" id="authTabRegister">ĐĂNG KÝ</button>
+                    </div>
+                    <div class="auth-body">
+                        <label for="authUserInput">Tên đăng nhập (hoặc Email)</label>
+                        <input type="text" id="authUserInput" placeholder="vd: chiquan5am" autocomplete="username">
+                        <label for="authPassInput">Mật khẩu (tối thiểu 6 ký tự)</label>
+                        <input type="password" id="authPassInput" placeholder="••••••" autocomplete="current-password">
+                        <div id="authStatusText"></div>
+                        <button type="button" id="authSubmitBtn">ĐĂNG NHẬP</button>
+                    </div>
+                </div>
             </div>
         </div>
-        <div id="authModal" hidden>
-            <div class="auth-card">
-                <div class="auth-header">
-                    <span>👤 TÀI KHOẢN CLOUD 5AM</span>
-                    <button type="button" id="authCloseBtn">✖</button>
+
+        <div id="mobileControls" hidden aria-label="Điều khiển cảm ứng">
+            <div class="mobile-topbar">
+                <button type="button" class="touch-chip" data-key="m" id="btnTouchM">🗺️ Bản đồ</button>
+                <button type="button" class="touch-chip" data-key="b" id="btnTouchB">📖 Sổ tay</button>
+                <button type="button" class="touch-chip" data-key="v" id="btnTouchV">🛵 Xe</button>
+                <button type="button" class="touch-chip" data-key="f" id="btnTouchF" hidden>📦 Ship</button>
+                <button type="button" class="touch-chip" data-key="k" id="btnTouchK" hidden>⚙️ Quản lý</button>
+                <button type="button" class="touch-chip" id="btnTouchFullscreen">⛶ Toàn màn hình</button>
+            </div>
+            <div class="mobile-pad-row">
+                <div class="joystick-zone">
+                    <div id="touchJoystick" role="application" aria-label="Cần di chuyển">
+                        <span class="joy-arrow joy-up">▲</span>
+                        <span class="joy-arrow joy-down">▼</span>
+                        <span class="joy-arrow joy-left">◀</span>
+                        <span class="joy-arrow joy-right">▶</span>
+                        <div id="touchJoystickKnob"></div>
+                    </div>
                 </div>
-                <div class="auth-tabs">
-                    <button type="button" id="authTabLogin" class="active">ĐĂNG NHẬP</button>
-                    <button type="button" id="authTabRegister">ĐĂNG KÝ</button>
-                </div>
-                <div class="auth-body">
-                    <label for="authUserInput">Tên đăng nhập (hoặc Email)</label>
-                    <input type="text" id="authUserInput" placeholder="vd: chiquan5am" autocomplete="username">
-                    <label for="authPassInput">Mật khẩu (tối thiểu 6 ký tự)</label>
-                    <input type="password" id="authPassInput" placeholder="••••••" autocomplete="current-password">
-                    <div id="authStatusText"></div>
-                    <button type="button" id="authSubmitBtn">ĐĂNG NHẬP</button>
+                <div class="action-cluster">
+                    <div class="action-secondary-row">
+                        <button type="button" class="touch-btn touch-btn-sub" data-key="g" id="btnTouchG">🛒 Xe CF</button>
+                        <button type="button" class="touch-btn touch-btn-sub" data-key="c" id="btnTouchC">🔒 Mở/Đóng</button>
+                        <button type="button" class="touch-btn touch-btn-sub" data-key="h" id="btnTouchH" hidden>🔔 Còi</button>
+                    </div>
+                    <div class="action-primary-row">
+                        <button type="button" class="touch-btn touch-btn-close" data-key="q" id="btnTouchQ">✖ Đóng</button>
+                        <button type="button" class="touch-btn touch-btn-main" data-key="e" id="btnTouchE">✋ Tương tác</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="constants.js?v=mekong-river-1"></script>
-    <script src="audio.js"></script>
-    <script src="cloud.js"></script>
-    <script src="game.js?v=mekong-river-1"></script>
+    <button type="button" id="toggleMobilePadBtn" title="Bật/tắt tay cầm cảm ứng">📱</button>
+
+    <script src="constants.js?v=guide-2"></script>
+    <script src="audio.js?v=guide-2"></script>
+    <script src="cloud.js?v=guide-2"></script>
+    <script src="game.js?v=guide-2"></script>
 </body>
 </html>

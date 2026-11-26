@@ -31,6 +31,7 @@
             this.slots = [null, null, null];
             this.activeSlot = 0;
             this.isBusy = false;
+            this._syncQueue = Promise.resolve();
             this._restoreLocalSession();
         }
 
@@ -165,6 +166,13 @@
         }
 
         signOut() {
+            const token = this.session?.access_token;
+            if (token) {
+                fetch(`${SUPABASE_URL}/auth/v1/logout`, {
+                    method: 'POST',
+                    headers: this._headers(true)
+                }).catch(() => {});
+            }
             this.slots = [null, null, null];
             this.activeSlot = 0;
             this._persistSession(null);
@@ -173,16 +181,38 @@
         async saveSlot(slotIndex, saveData) {
             if (!this.isLoggedIn()) return { ok: false, error: 'Chưa đăng nhập.' };
             const idx = Math.max(0, Math.min(2, Number(slotIndex) || 0));
-            this.activeSlot = idx;
-            this.slots[idx] = saveData;
-            return this._syncSlotsToCloud();
+            return this._enqueueSync(async () => {
+                const prevSlots = [...this.slots];
+                const prevActive = this.activeSlot;
+                this.activeSlot = idx;
+                this.slots[idx] = saveData;
+                const res = await this._syncSlotsToCloud();
+                if (!res.ok) {
+                    this.slots = prevSlots;
+                    this.activeSlot = prevActive;
+                }
+                return res;
+            });
         }
 
         async deleteSlot(slotIndex) {
             if (!this.isLoggedIn()) return { ok: false, error: 'Chưa đăng nhập.' };
             const idx = Math.max(0, Math.min(2, Number(slotIndex) || 0));
-            this.slots[idx] = null;
-            return this._syncSlotsToCloud();
+            return this._enqueueSync(async () => {
+                const prevSlots = [...this.slots];
+                this.slots[idx] = null;
+                const res = await this._syncSlotsToCloud();
+                if (!res.ok) {
+                    this.slots = prevSlots;
+                }
+                return res;
+            });
+        }
+
+        _enqueueSync(task) {
+            const next = this._syncQueue.then(task, task);
+            this._syncQueue = next.catch(() => {});
+            return next;
         }
 
         async _syncSlotsToCloud() {

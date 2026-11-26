@@ -216,10 +216,7 @@
         }
 
         _playBGMPerc(time, kind = 'hat') {
-            if (!this.noiseBuffer || !this.ctx) return;
-            const src = this.ctx.createBufferSource();
-            src.buffer = this.noiseBuffer;
-            const filter = this.ctx.createBiquadFilter();
+            if (!this.ctx) return;
             const g = this.ctx.createGain();
 
             if (kind === 'kick') {
@@ -236,6 +233,10 @@
                 return;
             }
 
+            if (!this.noiseBuffer) return;
+            const src = this.ctx.createBufferSource();
+            src.buffer = this.noiseBuffer;
+            const filter = this.ctx.createBiquadFilter();
             filter.type = 'highpass';
             filter.frequency.value = kind === 'snare' ? 1400 : 4200;
             const peak = kind === 'snare' ? 0.07 : 0.032;
@@ -318,6 +319,10 @@
             const data = this._getThemeData(this.currentTheme);
             if (!data) return;
 
+            if (this.nextNoteTime < this.ctx.currentTime - 0.2) {
+                this.nextNoteTime = this.ctx.currentTime + 0.05;
+            }
+
             while (this.nextNoteTime < this.ctx.currentTime + 0.18) {
                 const step = this.bgmStep % 16;
                 const chordIdx = Math.floor(step / 4);
@@ -397,7 +402,8 @@
             }
 
             // 3. Tiếng xe máy chạy ngoài đường (Street traffic)
-            const hearTraffic = state.gameState === 'PLAYING_STREET' && !state.isIndoors && state.zone !== 'PARK' && state.nearestBike;
+            const noTrafficZones = ['PARK', 'BREEZE_AREA', 'ELDERLY_AREA', 'VUNGTAU_FISHING'];
+            const hearTraffic = state.gameState === 'PLAYING_STREET' && !state.isIndoors && !noTrafficZones.includes(state.zone) && state.nearestBike;
             if (hearTraffic) {
                 const dist = state.nearestBike.dist;
                 const maxDist = 620;

@@ -1,9 +1,24 @@
 /* style.css - Giao diện Pixel Art Sài Gòn Hoài Cổ (Warm Vintage Palette) */
+:root {
+    --game-scale: 1;
+}
+
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
     user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+    width: 100%;
+    min-height: 100%;
+    touch-action: manipulation;
+    overscroll-behavior: none;
 }
 
 body {
@@ -19,12 +34,26 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
-    overflow: hidden;
+    min-height: 100dvh;
+    padding: 8px;
+    overflow: auto;
+}
+
+#appShell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    max-width: 100%;
 }
 
 .game-container {
     position: relative;
+    flex-shrink: 0;
+    width: calc(1000px * var(--game-scale));
+    height: calc(650px * var(--game-scale));
     border: 4px solid #d9ad62;
     outline: 4px solid #38292b;
     background-color: #27232c;
@@ -38,22 +67,25 @@ body {
 
 canvas {
     display: block;
+    width: 100%;
+    height: 100%;
     background: #292632;
     image-rendering: -moz-crisp-edges;
     image-rendering: -webkit-crisp-edges;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
     cursor: pointer;
+    touch-action: none;
 }
 
 #playerFormFields {
     position: absolute;
-    top: 135px;
-    left: 344px;
-    width: 533px;
+    top: 20.77%;
+    left: 34.4%;
+    width: 53.3%;
     display: none;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    gap: calc(16px * var(--game-scale));
     z-index: 10;
 }
 
@@ -62,14 +94,16 @@ canvas {
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: calc(4px * var(--game-scale));
     color: #6a5147;
-    font: 700 12px 'Chakra Petch', monospace;
+    font-family: 'Chakra Petch', monospace;
+    font-weight: 700;
+    font-size: max(10px, calc(12px * var(--game-scale)));
 }
 
 .player-field label,
 #playerBirthdayField label {
-    line-height: 15px;
+    line-height: 1.25;
 }
 
 #playerBirthdayField[hidden] {
@@ -80,17 +114,19 @@ canvas {
     position: static;
     transform: none;
     width: 100%;
-    height: 37px;
-    padding: 6px 10px;
+    height: max(28px, calc(37px * var(--game-scale)));
+    padding: calc(5px * var(--game-scale)) calc(8px * var(--game-scale));
     font-family: 'Chakra Petch', monospace;
     font-weight: 700;
-    font-size: 15px;
+    font-size: max(12px, calc(15px * var(--game-scale)));
     text-align: center;
     border: 2px solid #52372f;
     box-shadow: 3px 3px 0 #34262a, inset 0 2px 0 rgba(255, 255, 255, 0.48);
     background-color: #fff1d3;
     color: #3d2a2b;
     outline: none;
+    user-select: text;
+    -webkit-user-select: text;
 }
 
 #playerNameInput:focus {
@@ -105,23 +141,28 @@ canvas {
 
 #playerBirthdayInput {
     width: 100%;
-    height: 37px;
-    padding: 5px 9px;
+    height: max(28px, calc(37px * var(--game-scale)));
+    padding: calc(4px * var(--game-scale)) calc(8px * var(--game-scale));
     border: 2px solid #52372f;
     box-shadow: 3px 3px 0 #34262a, inset 0 2px 0 rgba(255, 255, 255, 0.48);
     background: #fff6e5;
     color: #3d2a2b;
-    font: 700 15px 'Chakra Petch', monospace;
+    font-family: 'Chakra Petch', monospace;
+    font-weight: 700;
+    font-size: max(12px, calc(15px * var(--game-scale)));
+    user-select: text;
+    -webkit-user-select: text;
 }
 
 #authModal {
-    position: absolute;
+    position: fixed;
     inset: 0;
-    background: rgba(16, 13, 18, 0.78);
+    background: rgba(16, 13, 18, 0.82);
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 25;
+    padding: 12px;
+    z-index: 50;
 }
 
 #authModal[hidden] {
@@ -129,7 +170,9 @@ canvas {
 }
 
 .auth-card {
-    width: 400px;
+    width: min(400px, calc(100vw - 24px));
+    max-height: 92dvh;
+    overflow-y: auto;
     background: #fff4dc;
     border: 4px solid #e4b965;
     outline: 3px solid #3d2a2b;
@@ -152,7 +195,7 @@ canvas {
     background: #c84b31;
     color: #fff;
     border: 2px solid #2b1d1a;
-    padding: 2px 8px;
+    padding: 4px 10px;
     cursor: pointer;
     font-weight: 700;
 }
@@ -165,7 +208,7 @@ canvas {
 }
 
 .auth-tabs button {
-    padding: 8px;
+    padding: 10px 8px;
     font-family: 'Chakra Petch', monospace;
     font-weight: 700;
     border: 2px solid #52372f;
@@ -193,13 +236,15 @@ canvas {
 }
 
 .auth-body input {
-    height: 36px;
+    height: 40px;
     padding: 6px 10px;
     border: 2px solid #52372f;
     background: #fffaf0;
     color: #3d2a2b;
-    font: 700 14px 'Chakra Petch', monospace;
+    font: 700 16px 'Chakra Petch', monospace;
     outline: none;
+    user-select: text;
+    -webkit-user-select: text;
 }
 
 #authStatusText {
@@ -211,7 +256,7 @@ canvas {
 
 #authSubmitBtn {
     margin-top: 4px;
-    height: 40px;
+    height: 44px;
     background: #547d4e;
     color: #fff6e4;
     border: 2px solid #2d3e28;
@@ -221,4 +266,279 @@ canvas {
 
 #authSubmitBtn:hover {
     background: #618f5a;
+}
+
+/* =========================================================================
+   ĐIỀU KHIỂN CẢM ỨNG MOBILE (PORTRAIT & LANDSCAPE)
+   ========================================================================= */
+#toggleMobilePadBtn {
+    position: fixed;
+    right: 10px;
+    bottom: 10px;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    border: 2px solid #e4b965;
+    background: rgba(43, 29, 22, 0.85);
+    color: #fff3d6;
+    font-size: 18px;
+    cursor: pointer;
+    z-index: 45;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
+body.is-mobile {
+    padding: env(safe-area-inset-top, 4px) env(safe-area-inset-right, 4px) env(safe-area-inset-bottom, 4px) env(safe-area-inset-left, 4px);
+    overflow: hidden;
+    height: 100dvh;
+}
+
+body.is-mobile .game-container {
+    border-width: 2px;
+    outline-width: 2px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+body.is-mobile #toggleMobilePadBtn {
+    display: none;
+}
+
+#mobileControls {
+    width: min(100vw - 12px, 640px);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+    background: rgba(34, 26, 28, 0.92);
+    border: 2px solid #d9ad62;
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+    touch-action: none;
+    z-index: 30;
+}
+
+#mobileControls[hidden] {
+    display: none;
+}
+
+.mobile-topbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+}
+
+.touch-chip {
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 2px solid #38292b;
+    background: #ecd3ab;
+    color: #2b1d16;
+    font: 700 12px 'Chakra Petch', monospace;
+    box-shadow: 0 2px 0 #2b1d16;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.touch-chip[hidden] {
+    display: none;
+}
+
+.touch-chip:active,
+.touch-chip.active {
+    transform: translateY(1px);
+    background: #f0b643;
+}
+
+.mobile-pad-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 6px;
+}
+
+.joystick-zone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+#touchJoystick {
+    position: relative;
+    width: 124px;
+    height: 124px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(236, 211, 171, 0.22), rgba(43, 29, 22, 0.72));
+    border: 3px solid rgba(228, 185, 101, 0.85);
+    box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.45);
+    touch-action: none;
+}
+
+.joy-arrow {
+    position: absolute;
+    color: rgba(255, 243, 214, 0.45);
+    font-size: 12px;
+    pointer-events: none;
+}
+
+.joy-up { top: 8px; left: 50%; transform: translateX(-50%); }
+.joy-down { bottom: 8px; left: 50%; transform: translateX(-50%); }
+.joy-left { left: 10px; top: 50%; transform: translateY(-50%); }
+.joy-right { right: 10px; top: 50%; transform: translateY(-50%); }
+
+#touchJoystickKnob {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 52px;
+    height: 52px;
+    margin-top: -26px;
+    margin-left: -26px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffe6aa, #d99b4e);
+    border: 3px solid #2b1d16;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.55);
+    pointer-events: none;
+    transition: transform 0.04s linear;
+}
+
+.action-cluster {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.action-secondary-row,
+.action-primary-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.touch-btn {
+    border: 2px solid #2b1d16;
+    border-radius: 12px;
+    font-family: 'Chakra Petch', monospace;
+    font-weight: 700;
+    box-shadow: 0 3px 0 #2b1d16;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.touch-btn[hidden] {
+    display: none;
+}
+
+.touch-btn:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 #2b1d16;
+}
+
+.touch-btn-sub {
+    padding: 8px 11px;
+    font-size: 12px;
+    background: #fff3d6;
+    color: #3d2a2b;
+}
+
+.touch-btn-sub.is-active {
+    background: #f0b643;
+    color: #2b1d16;
+}
+
+.touch-btn-close {
+    padding: 12px 14px;
+    font-size: 13px;
+    background: #c84b31;
+    color: #fff6e4;
+}
+
+.touch-btn-main {
+    min-width: 118px;
+    padding: 13px 16px;
+    font-size: 14px;
+    background: #547d4e;
+    color: #fff6e4;
+}
+
+.touch-btn-main.has-action {
+    background: #f0b643;
+    color: #2b1d16;
+    border-color: #fff6e4;
+    box-shadow: 0 0 12px rgba(240, 182, 67, 0.65), 0 3px 0 #2b1d16;
+}
+
+/* Chế độ xoay ngang (Landscape) trên điện thoại: phủ mờ tay cầm ở 2 góc dưới */
+body.is-mobile.is-landscape #appShell {
+    width: 100%;
+    height: 100%;
+    gap: 0;
+}
+
+body.is-mobile.is-landscape #mobileControls {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    padding: 6px max(10px, env(safe-area-inset-right, 10px)) max(10px, env(safe-area-inset-bottom, 10px)) max(10px, env(safe-area-inset-left, 10px));
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    justify-content: space-between;
+    pointer-events: none;
+}
+
+body.is-mobile.is-landscape .mobile-topbar {
+    justify-content: flex-end;
+    padding-top: 2px;
+    padding-right: 4px;
+    opacity: 0.9;
+}
+
+body.is-mobile.is-landscape .mobile-topbar button,
+body.is-mobile.is-landscape #touchJoystick,
+body.is-mobile.is-landscape .action-cluster button {
+    pointer-events: auto;
+}
+
+body.is-mobile.is-landscape .mobile-pad-row {
+    align-items: flex-end;
+    padding: 0 4px 4px;
+}
+
+body.is-mobile.is-landscape #touchJoystick {
+    width: 112px;
+    height: 112px;
+    opacity: 0.78;
+}
+
+body.is-mobile.is-landscape .action-cluster {
+    opacity: 0.88;
+}
+
+body.is-mobile.is-landscape .touch-chip {
+    padding: 4px 8px;
+    font-size: 11px;
+}
+
+body.is-mobile.is-landscape .touch-btn-main {
+    min-width: 104px;
+    padding: 11px 13px;
+    font-size: 13px;
+}
+
+body.is-mobile.is-landscape .touch-btn-close {
+    padding: 10px 12px;
+    font-size: 12px;
+}
+
+body.is-mobile.is-landscape .touch-btn-sub {
+    padding: 6px 9px;
+    font-size: 11px;
 }
