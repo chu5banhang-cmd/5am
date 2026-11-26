@@ -319,9 +319,50 @@ const SIGNATURE_RECIPES = [
         desc: 'Công thức Signature học từ Bà Sáu'
     }
 ];
+const STARTER_RECIPE_IDS = ['ca_phe_den', 'ca_phe_sua', 'bac_xiu'];
+const unlockedRecipes = new Set(STARTER_RECIPE_IDS);
+const recipeQuestStats = {
+    fruitBought: 0,
+    cupsOutsideHome: 0,
+    npcDrinksGifted: 0,
+    traCamSaSold: 0,
+    questsOrShipsDone: 0
+};
+const RECIPE_UNLOCK_QUESTS = {
+    tra_cam_sa: {
+        mentor: 'Cô Ba Tạp Hóa',
+        rewardRep: 1,
+        check: () => recipeQuestStats.fruitBought >= 1 && recipeQuestStats.cupsOutsideHome >= 3,
+        shortProgress: () => `Mua 🍊 Cô Ba (${Math.min(1, recipeQuestStats.fruitBought)}/1) · Bán ngoài hẻm (${Math.min(3, recipeQuestStats.cupsOutsideHome)}/3)`,
+        hint: () => `📜 Nhiệm vụ Cô Ba mở 🍹 Trà Cam Sả: Mua 1 rổ Trái Cây tại Tiệm Cô Ba (${Math.min(1, recipeQuestStats.fruitBought)}/1) và đẩy xe [G] sang khu khác (vd: Công Viên) bán 3 ly (${Math.min(3, recipeQuestStats.cupsOutsideHome)}/3)!`
+    },
+    cam_ep: {
+        mentor: 'Bé Út',
+        rewardRep: 1,
+        check: () => unlockedRecipes.has('tra_cam_sa') && recipeQuestStats.npcDrinksGifted >= 2 && recipeQuestStats.traCamSaSold >= 4,
+        shortProgress: () => `Mời nước cư dân (${Math.min(2, recipeQuestStats.npcDrinksGifted)}/2) · Pha Trà Cam Sả (${Math.min(4, recipeQuestStats.traCamSaSold)}/4)`,
+        hint: () => `📜 Nhiệm vụ Bé Út mở 🍊 Nước Cam Ép: Mời nước 2 cư dân khi trò chuyện (${Math.min(2, recipeQuestStats.npcDrinksGifted)}/2) và phục vụ 4 ly 🍹 Trà Cam Sả (${Math.min(4, recipeQuestStats.traCamSaSold)}/4)!`
+    },
+    cold_brew_dac_biet: {
+        mentor: 'Chú Tư',
+        rewardRep: 2,
+        check: () => totalCupsSold >= 18 && (cityReputation >= 10 || Object.keys(rentedProperties).length >= 1) && recipeQuestStats.questsOrShipsDone >= 1,
+        shortProgress: () => `Bán (${Math.min(18, totalCupsSold)}/18) · DT/Quán (${(cityReputation >= 10 || Object.keys(rentedProperties).length >= 1) ? '✓' : `${cityReputation}/10`}) · NV/Ship (${Math.min(1, recipeQuestStats.questsOrShipsDone)}/1)`,
+        hint: () => `📜 Nhiệm vụ Chú Tư mở ✨ Cold Brew Cam Sữa: Bán tổng 18 ly (${Math.min(18, totalCupsSold)}/18), đạt 10 Danh tiếng hoặc thuê 1 quán, và hoàn thành 1 Bảng Tin Hẻm hoặc 1 đơn Ship [F] (${Math.min(1, recipeQuestStats.questsOrShipsDone)}/1)!`
+    }
+};
 const unlockedSignatures = new Set();
 let totalCupsSold = 0;
 let totalRevenueEarned = 0;
+
+function isRecipeUnlocked(recipeId) {
+    return unlockedRecipes.has(recipeId) || unlockedSignatures.has(recipeId);
+}
+
+function getUnlockedBaseRecipes() {
+    const list = GAME_CONFIG.RECIPES.filter((r) => unlockedRecipes.has(r.id));
+    return list.length ? list : [GAME_CONFIG.RECIPES[0]];
+}
 
 function getBaristaRank(cups = totalCupsSold) {
     let cur = BARISTA_RANKS[0];
@@ -333,14 +374,67 @@ function getBaristaRank(cups = totalCupsSold) {
 
 function getAvailableRecipes() {
     return [
+        ...getUnlockedBaseRecipes(),
+        ...SIGNATURE_RECIPES.filter((r) => unlockedSignatures.has(r.id))
+    ];
+}
+
+function getBrewDisplayRecipes() {
+    return [
         ...GAME_CONFIG.RECIPES,
         ...SIGNATURE_RECIPES.filter((r) => unlockedSignatures.has(r.id))
     ];
 }
 
+function getRecipeQuestHint(recipeId) {
+    const q = RECIPE_UNLOCK_QUESTS[recipeId];
+    return q ? q.hint() : "🔒 Hoàn thành nhiệm vụ để mở khóa món này!";
+}
+
 function getRecipeByIndex(idx) {
     const list = getAvailableRecipes();
     return list[idx] || list[0];
+}
+
+let checkingRecipeQuests = false;
+function checkRecipeUnlockQuests() {
+    if (checkingRecipeQuests) return;
+    checkingRecipeQuests = true;
+    try {
+        let unlockedAny = true;
+        while (unlockedAny) {
+            unlockedAny = false;
+            for (const [recipeId, quest] of Object.entries(RECIPE_UNLOCK_QUESTS)) {
+                if (unlockedRecipes.has(recipeId)) continue;
+                if (!quest.check()) continue;
+
+                // Bảo toàn món khách đang gọi trước khi danh sách món mở khóa đổi chỉ số
+                const prevAvail = getAvailableRecipes();
+                const savedOrders = streetCustomers.map((c) => (prevAvail[c.wantedRecipeIdx] || prevAvail[0])?.id || null);
+
+                unlockedRecipes.add(recipeId);
+                unlockedAny = true;
+
+                const nextAvail = getAvailableRecipes();
+                streetCustomers.forEach((c, i) => {
+                    const targetId = savedOrders[i];
+                    if (targetId) {
+                        const newIdx = nextAvail.findIndex((r) => r.id === targetId);
+                        if (newIdx >= 0) c.wantedRecipeIdx = newIdx;
+                    }
+                });
+
+                const rec = GAME_CONFIG.RECIPES.find((r) => r.id === recipeId);
+                const rName = rec ? `${rec.icon} ${rec.name}` : recipeId;
+                addCityReputation(quest.rewardRep || 1);
+                GameAudio?.playUnlock();
+                addScreenPopup(500, 166, `🔓 MỞ KHÓA MÓN MỚI: ${rName}!`, "#f0b643");
+                showToast(`🎉 Xong thử thách ${quest.mentor}! Đã mở khóa món mới [${rName}] (+${quest.rewardRep || 1} Danh tiếng)!`, 320);
+            }
+        }
+    } finally {
+        checkingRecipeQuests = false;
+    }
 }
 
 // ============================================================================
@@ -369,7 +463,8 @@ function rollDailyQuest() {
         };
     }
     if (roll < 0.70) {
-        const recipe = GAME_CONFIG.RECIPES[Math.floor(Math.random() * Math.min(6, GAME_CONFIG.RECIPES.length))];
+        const pool = getUnlockedBaseRecipes();
+        const recipe = pool[Math.floor(Math.random() * pool.length)];
         const target = 2;
         return {
             kind: 'sell_drink',
@@ -412,6 +507,7 @@ function recordDailyQuestProgress(kind, meta = {}) {
     dailyQuest.progress = Math.min(dailyQuest.target, (dailyQuest.progress || 0) + 1);
     if (dailyQuest.progress >= dailyQuest.target) {
         dailyQuest.completed = true;
+        recipeQuestStats.questsOrShipsDone += 1;
         playerStats.money += dailyQuest.rewardMoney;
         dailyReport.revenue += dailyQuest.rewardMoney;
         addCityReputation(dailyQuest.rewardRep);
@@ -419,6 +515,7 @@ function recordDailyQuestProgress(kind, meta = {}) {
         addScreenPopup(110, 56, `+${dailyQuest.rewardMoney.toLocaleString('vi-VN')}đ`, "#2ecc71");
         addScreenPopup(500, 128, `📋 Hoàn thành Nhiệm vụ ngày! +${dailyQuest.rewardRep} Danh tiếng`, "#f0b643");
         showToast(`📋 Xong Bảng Tin Hẻm: "${dailyQuest.title}" · Thưởng +${moneyLabel(dailyQuest.rewardMoney)} & +${dailyQuest.rewardRep} Danh tiếng!`, 280);
+        checkRecipeUnlockQuests();
     }
 }
 
@@ -1086,8 +1183,11 @@ window.addEventListener('keydown', function (e) {
             }
             else if (showBrewModal && /^[1-9]$/.test(low)) {
                 const idx = Number(low) - 1;
-                const rec = getAvailableRecipes()[idx];
-                if (rec) brewAndSellDrink(rec);
+                const rec = getBrewDisplayRecipes()[idx];
+                if (rec) {
+                    if (isRecipeUnlocked(rec.id)) brewAndSellDrink(rec);
+                    else { GameAudio?.playClick(); showToast(getRecipeQuestHint(rec.id), 300); }
+                }
             } else if (low === 'k' && !e.repeat && indoorShop.rental && !showBankModal && !showManagementModal) {
                 closeAllModals();
                 selectedManagementShop = indoorShop.rental;
@@ -1147,8 +1247,11 @@ window.addEventListener('keydown', function (e) {
             }
         } else if (/^[1-9]$/.test(low) && showBrewModal) {
             const idx = Number(low) - 1;
-            const rec = getAvailableRecipes()[idx];
-            if (rec) brewAndSellDrink(rec);
+            const rec = getBrewDisplayRecipes()[idx];
+            if (rec) {
+                if (isRecipeUnlocked(rec.id)) brewAndSellDrink(rec);
+                else { GameAudio?.playClick(); showToast(getRecipeQuestHint(rec.id), 300); }
+            }
         }
     }
 });
@@ -1236,7 +1339,7 @@ let streetCustomers = [
     {
         id: 'cust_ban_thao', name: "Bạn Thảo", role: "Sinh viên thiết kế", kind: 'resident',
         genderIndex: 1, x: 1420, y: 755, dir: -1, speed: 0.88, shirt: "#e5a93c", shadow: "#b07d22", shorts: "#3d352e", accessory: "none",
-        wantedRecipeIdx: 3, state: 'wandering', targetSpotId: null, targetX: 0, targetY: 0, orderTimer: 80, animFrame: 0, animTimer: 0,
+        wantedRecipeIdx: 0, state: 'wandering', targetSpotId: null, targetX: 0, targetY: 0, orderTimer: 80, animFrame: 0, animTimer: 0,
         friendship: 0, talkedToday: false, giftedToday: false, lovedDrink: 'tra_cam_sa', dialogueIndex: 0,
         dialogues: [
             "Trà Đào Cam Sả ở đây thơm xỉu luôn á, uống xong có mood vẽ bài liền!",
@@ -1405,6 +1508,7 @@ function addCityReputation(amount) {
             GameAudio?.playUnlock();
             showToast(`Danh tiếng ${cityReputation}/100 · Đủ điều kiện thuê mặt bằng tại ${unlocked[0]}!`);
         }
+        checkRecipeUnlockQuests();
     }
 }
 
@@ -2770,12 +2874,14 @@ function drawManagementModal() {
             : `🏠 Tiền mặt bằng định kỳ (mỗi 25 ngày): ${moneyLabel(rentShare)} · Còn ${daysLeftRent} ngày tới kỳ đóng`,
         500, 158, 620
     );
+    const unlockedBase = getUnlockedBaseRecipes();
+    const focusRecipe = unlockedBase[dailyRecipeIndex % unlockedBase.length] || GAME_CONFIG.RECIPES[0];
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.fillText(`Giá bán ${(priceOptions[dailyPriceIndex] * 100).toFixed(0)}% · Món trọng tâm ${GAME_CONFIG.RECIPES[dailyRecipeIndex].name} · Khách quen hôm nay: ${dailyRegularOrders}/3`, 500, 182, 620);
+    ctx.fillText(`Giá bán ${(priceOptions[dailyPriceIndex] * 100).toFixed(0)}% · Món trọng tâm ${focusRecipe.name} · Khách quen hôm nay: ${dailyRegularOrders}/3`, 500, 182, 620);
     pOutlinedRect(ctx, 220, 200, 560, 38, "#fff3d6");
     ctx.fillText(`Giá bán: ${priceOptions.map((v,i)=>`${i===dailyPriceIndex?'●':'○'} ${Math.round(v*100)}%`).join('   ')}`, 500, 224);
     pOutlinedRect(ctx, 220, 246, 560, 38, "#fff3d6");
-    ctx.fillText(`Món trọng tâm: ${GAME_CONFIG.RECIPES[dailyRecipeIndex].name}  ◀ ▶`, 500, 270);
+    ctx.fillText(`Món trọng tâm: ${focusRecipe.name}  ◀ ▶`, 500, 270);
     shopUpgrades.forEach((upgrade,index) => {
         const y=294+index*43; const owned=Boolean(upgrades[upgrade.id]);
         pOutlinedRect(ctx,220,y,560,36,owned?'#b6d6a0':'#fff3d6');
@@ -2797,7 +2903,7 @@ function drawManagementModal() {
 function handleManagementClick(x,y) {
     if (x>=420&&x<=580&&y>=524&&y<=560){closeAllModals();return;}
     if (x>=220&&x<=780&&y>=200&&y<=238){dailyPriceIndex=(dailyPriceIndex+1)%priceOptions.length;return;}
-    if (x>=220&&x<=780&&y>=246&&y<=284){dailyRecipeIndex=(dailyRecipeIndex+1)%GAME_CONFIG.RECIPES.length;return;}
+    if (x>=220&&x<=780&&y>=246&&y<=284){dailyRecipeIndex=(dailyRecipeIndex+1)%getUnlockedBaseRecipes().length;return;}
     if (x>=220&&x<=780&&y>=426&&y<=464){
         const business=currentBusiness();
         if(!business)return;
@@ -5644,10 +5750,12 @@ function buyIngredientAtMarket(item) {
     } else {
         GameAudio?.playBuy();
         addInventory(item.id, item.packAmount);
+        if (item.id === 'fruit') recipeQuestStats.fruitBought += 1;
         addScreenPopup(560, 56, "+" + item.packAmount + " " + item.icon + " " + item.name, "#2ecc71");
         showToast("🛒 Đã mua +" + item.packAmount + " phần [" + item.name + "] (-" + price.toLocaleString('vi-VN') + "đ)");
     }
     completeTutorialStep(1);
+    checkRecipeUnlockQuests();
 }
 
 function clearFestivalOrders() {
@@ -5764,6 +5872,11 @@ function getWaitingCustomersAtSpot(spotId) {
 
 function brewAndSellDrink(recipe) {
     if (!recipe) return;
+    if (!isRecipeUnlocked(recipe.id)) {
+        GameAudio?.playClick();
+        showToast(getRecipeQuestHint(recipe.id), 300);
+        return;
+    }
     if (currentZone === 'PARK' && getTodayFestival() &&
         (activeBrewSpot?.spotId !== 'festival_stall' || festivalChoice !== 'sell' || playerStats.hour < 9 || playerStats.hour >= 21)) {
         showToast("Chọn bán cà phê và dùng quầy lễ hội từ 09:00 đến 21:00.");
@@ -5893,7 +6006,10 @@ function brewAndSellDrink(recipe) {
     matchedCustomer.wantedRecipeIdx = Math.floor(Math.random() * getAvailableRecipes().length);
 
     showToast(recipe.icon + " Đã phục vụ [" + recipe.name + "] thu về +" + finalPrice.toLocaleString('vi-VN') + "đ!", 160);
+    if (currentZone !== 'HOME_STREET') recipeQuestStats.cupsOutsideHome += 1;
+    if (recipe.id === 'tra_cam_sa') recipeQuestStats.traCamSaSold += 1;
     completeTutorialStep(2);
+    checkRecipeUnlockQuests();
     if (playerStats.energy > 0 && playerStats.energy <= 20 && !lowEnergyWarned) {
         lowEnergyWarned = true;
         showToast("⚡ Thể lực sắp cạn (<20)! Ăn Bánh Mì ở Cô Ba hoặc về giường ngủ kẻo ngất mất 1 triệu viện phí!", 280);
@@ -6069,6 +6185,11 @@ function giftDrinkToActiveNPC(recipeIdx) {
     const npc = activeDialogueNPC;
     const recipe = GAME_CONFIG.RECIPES[recipeIdx];
     if (!npc || !recipe) return;
+    if (!isRecipeUnlocked(recipe.id)) {
+        GameAudio?.playClick();
+        showToast(getRecipeQuestHint(recipe.id), 300);
+        return;
+    }
     if (npc.giftedToday) {
         showToast(`💛 Hôm nay bạn đã mời nước ${npc.name} rồi!`);
         return;
@@ -6090,6 +6211,7 @@ function giftDrinkToActiveNPC(recipeIdx) {
     npc.giftedToday = true;
     recordRelationshipDay(npc);
     recordDailyQuestProgress('gift_npc');
+    recipeQuestStats.npcDrinksGifted += 1;
     addScreenPopup(520, 458, `+${pts} ❤️ (${recipe.name})`, isLoved ? "#e84393" : "#2ecc71");
     showToast(
         isBirthday
@@ -6099,6 +6221,7 @@ function giftDrinkToActiveNPC(recipeIdx) {
             : `🎁 Đã mời ${npc.name} ly [${recipe.name}] (+${pts} điểm thân thiết)`,
         190
     );
+    checkRecipeUnlockQuests();
 }
 
 function getNPCDialogues(npc) {
@@ -6237,6 +6360,7 @@ function completeBusinessRental(rental, type, partner) {
         dailyReport.rentCost += quote.due;
         addCityReputation(2);
         recordChapterAction('rental');
+        checkRecipeUnlockQuests();
     }
     closeAllModals();
     showToast(partner ? "Đã cọc. Kiểm tra kết quả hùn vốn vào sáng mai." :
@@ -6387,8 +6511,9 @@ function generateDeliveryOffers() {
     const targetZones = getDeliveryTargetZones();
     const curHour = Math.floor(playerStats.hour || 5);
     const offers = [];
+    const unlockedPool = getUnlockedBaseRecipes();
     for (let i = 0; i < 3; i++) {
-        const recipe = GAME_CONFIG.RECIPES[Math.floor(Math.random() * GAME_CONFIG.RECIPES.length)];
+        const recipe = unlockedPool[Math.floor(Math.random() * unlockedPool.length)];
         const zoneKey = targetZones[Math.floor(Math.random() * targetZones.length)];
         const zone = GAME_CONFIG.ZONES[zoneKey];
         const zoneRoster = npcRosters[zoneKey]?.length ? npcRosters[zoneKey] : storyNPCs;
@@ -6467,8 +6592,10 @@ function deliverActiveOrder() {
         addScreenPopup(500, 180, `🏆 LÊN CẤP BARISTA LV.${newRank.level}: ${newRank.name}!`, "#f0b643");
     }
     deliveryCompletedToday += 1;
+    recipeQuestStats.questsOrShipsDone += 1;
     const earnedRepToday = deliveryCompletedToday === 1;
     if (earnedRepToday) addCityReputation(1);
+    checkRecipeUnlockQuests();
     GameAudio?.playCoin();
     const targetNpc = storyNPCs.find((n) => n.id === activeDeliveryOrder.customerId);
     if (targetNpc) {
@@ -7674,9 +7801,11 @@ function updateShopCustomers(festival = null) {
                 chosen.isVipReviewer = !vipSpawnedToday && (dailyReport.cupsSold >= 1 || playerStats.hour >= 8) && Math.random() < 0.22;
                 if (chosen.isVipReviewer) vipSpawnedToday = true;
                 const availRecipes = getAvailableRecipes();
+                const unlockedBase = getUnlockedBaseRecipes();
+                const focusIdx = Math.min(availRecipes.length - 1, dailyRecipeIndex % unlockedBase.length);
                 const prefIdx = availRecipes.findIndex((r) => r.id === wInfo.preferredDrink);
                 chosen.wantedRecipeIdx = chosen.isRegularOrder && Math.random() < 0.7
-                    ? dailyRecipeIndex
+                    ? focusIdx
                     : (prefIdx >= 0 && Math.random() < 0.4 ? prefIdx : Math.floor(Math.random() * availRecipes.length));
                 spotOrderCooldown = zoneCooldown;
             }
@@ -9047,7 +9176,8 @@ function getBrewModalLayout(count) {
 
 function drawBrewModal() {
     if (!showBrewModal) return;
-    const recipes = getAvailableRecipes();
+    const recipes = getBrewDisplayRecipes();
+    const unlockedCount = getAvailableRecipes().length;
     const layout = getBrewModalLayout(recipes.length);
     const { mx, my, mw, mh, listTop, rowStep, rowH, compact } = layout;
     const zInfo = GAME_CONFIG.ZONES[currentZone];
@@ -9065,7 +9195,7 @@ function drawBrewModal() {
     ctx.fillStyle = "#f0b643";
     ctx.font = "bold 13.5px 'Chakra Petch', sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText(`☕ MENU PHA CHẾ (x${Number(mult.toFixed(2))} · Lv.${rank.level})`, mx + 16, my + 29);
+    ctx.fillText(`☕ MENU (${unlockedCount}/${recipes.length} món · x${Number(mult.toFixed(2))} · Lv.${rank.level})`, mx + 16, my + 29, mw - 64);
 
     pOutlinedRect(ctx, mx + mw - 42, my + 10, 30, 28, "#2b1d16");
     ctx.fillStyle = "#ffffff";
@@ -9085,7 +9215,7 @@ function drawBrewModal() {
         ctx.fillText("⏳ Đang chờ khách lại quầy gọi món...", mx + mw / 2, my + 67);
     }
 
-    // Danh sách các món nước (6 món cơ bản + tối đa 3 món Signature)
+    // Danh sách các món nước (3 món đầu + 3 món nhiệm vụ mở khóa + tối đa 3 món Signature)
     const business = spotId ? businesses[spotId] : null;
     const partnerShare = business?.partner?.share || 0;
     const reputationBonus = 1 + Math.min(0.15, customerReputation / 500);
@@ -9093,6 +9223,29 @@ function drawBrewModal() {
 
     recipes.forEach((rcp, idx) => {
         const rowY = listTop + idx * rowStep;
+        const unlocked = isRecipeUnlocked(rcp.id);
+
+        if (!unlocked) {
+            const q = RECIPE_UNLOCK_QUESTS[rcp.id];
+            pOutlinedRect(ctx, mx + 14, rowY, mw - 28, rowH, "#e2d5be");
+            ctx.fillStyle = "#6c594b";
+            ctx.font = compact ? "bold 11.5px 'Chakra Petch', sans-serif" : "bold 12.5px 'Chakra Petch', sans-serif";
+            ctx.textAlign = "left";
+            ctx.fillText(`🔒 ${rcp.icon} ${rcp.name}`, mx + 22, rowY + (compact ? 17 : 20), 232);
+            ctx.fillStyle = "#8a5a36";
+            ctx.font = compact ? "9.5px 'Chakra Petch', sans-serif" : "10.5px 'Chakra Petch', sans-serif";
+            ctx.fillText(q ? q.shortProgress() : "Hoàn thành nhiệm vụ để mở", mx + 22, rowY + (compact ? 33 : 40), 240);
+
+            const btnH = compact ? rowH - 10 : 34;
+            const btnY = rowY + Math.floor((rowH - btnH) / 2);
+            pOutlinedRect(ctx, mx + mw - 110, btnY, 90, btnH, "#8d7563");
+            ctx.fillStyle = "#fff6e5";
+            ctx.font = "bold 10.5px 'Chakra Petch', sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("📜 NHIỆM VỤ", mx + mw - 65, btnY + Math.floor(btnH / 2) + 4);
+            return;
+        }
+
         const matchedWait = waitingHere.find((c) => getRecipeByIndex(c.wantedRecipeIdx).id === rcp.id);
         const grossPrice = Math.round(rcp.baseSellPrice * mult * priceOptions[dailyPriceIndex] * reputationBonus * rank.priceMult / 1000) * 1000;
         const regularBonus = matchedWait?.isRegularOrder ? Math.round(grossPrice * 0.1) : 0;
@@ -9149,13 +9302,13 @@ function drawBrewModal() {
     });
 
     ctx.fillStyle = "#6e4736";
-    ctx.font = "bold 11px 'Chakra Petch', sans-serif";
+    ctx.font = "bold 10.5px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(`Nhấn phím [1]–[${recipes.length}] để pha nhanh | [Q] Đóng`, mx + mw / 2, my + mh - 12);
+    ctx.fillText(`Phím [1]–[${recipes.length}] pha nhanh · Bấm món 🔒 xem nhiệm vụ | [Q] Đóng`, mx + mw / 2, my + mh - 12);
 }
 
 function handleBrewModalClick(mx, my) {
-    const recipes = getAvailableRecipes();
+    const recipes = getBrewDisplayRecipes();
     const { mx: panelX, my: panelY, mw: panelW, mh: panelH, listTop, rowStep, rowH } = getBrewModalLayout(recipes.length);
 
     // Click ngoài bảng hoặc nút ✖ để đóng
@@ -9169,6 +9322,13 @@ function handleBrewModalClick(mx, my) {
 
     recipes.forEach((rcp, idx) => {
         const rowY = listTop + idx * rowStep;
+        if (!isRecipeUnlocked(rcp.id)) {
+            if (mx >= panelX + 14 && mx <= panelX + panelW - 14 && my >= rowY && my <= rowY + rowH) {
+                GameAudio?.playClick();
+                showToast(getRecipeQuestHint(rcp.id), 300);
+            }
+            return;
+        }
         if (mx >= panelX + panelW - 118 && mx <= panelX + panelW - 20 && my >= rowY + 3 && my <= rowY + rowH - 3) {
             brewAndSellDrink(rcp);
         }
@@ -10949,12 +11109,13 @@ function drawDialogueModal() {
         ctx.fillText("🎁 Mời:", 244, 594);
         GAME_CONFIG.RECIPES.forEach((rec, idx) => {
             const bx = 310 + idx * 96;
-            const canMake = Object.entries(rec.need).every(([ing, amt]) => (inventory[ing] || 0) >= amt);
-            pOutlinedRect(ctx, bx, 577, 92, 26, canMake ? "#f7d794" : "#dfd1b4");
+            const unlocked = isRecipeUnlocked(rec.id);
+            const canMake = unlocked && Object.entries(rec.need).every(([ing, amt]) => (inventory[ing] || 0) >= amt);
+            pOutlinedRect(ctx, bx, 577, 92, 26, !unlocked ? "#d8cbb5" : (canMake ? "#f7d794" : "#dfd1b4"));
             ctx.fillStyle = canMake ? PAL.OUTLINE : "#8a7c72";
             ctx.font = "bold 9.5px 'Chakra Petch', sans-serif";
             ctx.textAlign = "center";
-            ctx.fillText(`${rec.icon} ${rec.name.replace("Cà Phê ", "CF ")}`, bx + 46, 594, 86);
+            ctx.fillText(unlocked ? `${rec.icon} ${rec.name.replace("Cà Phê ", "CF ")}` : "🔒 Chưa mở", bx + 46, 594, 86);
         });
     }
 
@@ -11225,6 +11386,8 @@ function exportSaveData() {
         fridgeLevel,
         totalCupsSold,
         totalRevenueEarned,
+        unlockedRecipes: Array.from(unlockedRecipes),
+        recipeQuestStats: { ...recipeQuestStats },
         unlockedSignatures: Array.from(unlockedSignatures),
         yearOneSummarySeen,
         tutorialStep,
@@ -11352,6 +11515,23 @@ function applySaveData(data) {
     fridgeLevel = Math.max(0, Math.min(FRIDGE_UPGRADES.length - 1, Number(data.fridgeLevel) || 0));
     totalCupsSold = Math.max(0, Number(data.totalCupsSold) || 0);
     totalRevenueEarned = Math.max(0, Number(data.totalRevenueEarned) || 0);
+    unlockedRecipes.clear();
+    if (Array.isArray(data.unlockedRecipes) && data.unlockedRecipes.length) {
+        STARTER_RECIPE_IDS.forEach((id) => unlockedRecipes.add(id));
+        data.unlockedRecipes.forEach((id) => unlockedRecipes.add(id));
+    } else if ((playerStats.day || 1) > 3 || totalCupsSold >= 18 || Object.keys(rentedProperties).length > 0) {
+        GAME_CONFIG.RECIPES.forEach((r) => unlockedRecipes.add(r.id));
+    } else {
+        STARTER_RECIPE_IDS.forEach((id) => unlockedRecipes.add(id));
+    }
+    Object.assign(recipeQuestStats, {
+        fruitBought: 0,
+        cupsOutsideHome: 0,
+        npcDrinksGifted: 0,
+        traCamSaSold: 0,
+        questsOrShipsDone: 0,
+        ...(data.recipeQuestStats || {})
+    });
     unlockedSignatures.clear();
     if (Array.isArray(data.unlockedSignatures)) {
         data.unlockedSignatures.forEach((id) => unlockedSignatures.add(id));
