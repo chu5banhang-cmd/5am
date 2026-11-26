@@ -4,6 +4,37 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
+// Tự động tăng cỡ chữ & độ đậm nhẹ cho font nhỏ khi hiển thị trên màn hình điện thoại
+let mobileFontBoostPx = 0;
+(function installMobileFontBooster() {
+    try {
+        const desc = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'font');
+        if (!desc || !desc.set || !desc.get) return;
+        Object.defineProperty(ctx, 'font', {
+            configurable: true,
+            get() {
+                return desc.get.call(this);
+            },
+            set(val) {
+                if (mobileFontBoostPx > 0 && typeof val === 'string') {
+                    const boosted = val.replace(/(^|\s)(\d+(?:\.\d+)?)px(?=\s)/, (m, pre, numStr) => {
+                        const sz = parseFloat(numStr);
+                        if (!Number.isFinite(sz) || sz >= 17) return m;
+                        const add = sz <= 12.5 ? mobileFontBoostPx : mobileFontBoostPx * 0.72;
+                        const nextSz = Math.min(17.5, Math.round((sz + add) * 2) / 2);
+                        return `${pre}${nextSz}px`;
+                    });
+                    const finalFont = (!/\b(bold|600|700|800|900)\b/i.test(boosted) && /\b(1[0-5](?:\.\d+)?)px\b/.test(boosted))
+                        ? `600 ${boosted}`
+                        : boosted;
+                    return desc.set.call(this, finalFont);
+                }
+                return desc.set.call(this, val);
+            }
+        });
+    } catch (_) {}
+})();
+
 const nameInput = document.getElementById('playerNameInput');
 const birthdayField = document.getElementById('playerBirthdayField');
 const birthdayInput = document.getElementById('playerBirthdayInput');
@@ -745,7 +776,7 @@ function drawGuideBarInHUD() {
     pOutlinedRect(ctx, bx, by, bw, bh, info.isTutorial ? "#fff2c6" : "#f3e5c8");
     ctx.textAlign = "left";
     ctx.fillStyle = info.isTutorial ? "#9c341e" : "#4a3525";
-    ctx.font = "bold 12px 'Chakra Petch', sans-serif";
+    ctx.font = "bold 13.5px 'Chakra Petch', sans-serif";
     const textMaxW = info.isTutorial ? 430 : 494;
     ctx.fillText(`🎯 [${info.badge}] ${info.title}`, bx + 10, by + 19, textMaxW);
 
@@ -753,8 +784,8 @@ function drawGuideBarInHUD() {
         pOutlinedRect(ctx, bx + bw - 62, by + 4, 56, 20, "#dfd1b4");
         ctx.textAlign = "center";
         ctx.fillStyle = "#5c4033";
-        ctx.font = "bold 10.5px 'Chakra Petch', sans-serif";
-        ctx.fillText("Bỏ qua", bx + bw - 34, by + 18);
+        ctx.font = "bold 12px 'Chakra Petch', sans-serif";
+        ctx.fillText("Bỏ qua", bx + bw - 34, by + 18, 52);
     }
 }
 
@@ -785,14 +816,14 @@ function drawGuideCompassAndBeacon() {
     ctx.save();
     if (onScreen) {
         // Vẽ mũi tên vàng nhấp nháy ngay trên mục tiêu trong tầm mắt
-        const ty = Math.max(padTop, sy - 38 + bob);
-        ctx.font = "bold 11.5px 'Chakra Petch', sans-serif";
+        const ty = Math.max(padTop, sy - 40 + bob);
+        ctx.font = "bold 13.5px 'Chakra Petch', sans-serif";
         const lbl = `▼ ${target.label}`;
-        const tw = Math.max(76, ctx.measureText(lbl).width + 18);
-        pOutlinedRect(ctx, sx - tw / 2, ty - 18, tw, 22, "#f0b643");
+        const tw = Math.max(88, ctx.measureText(lbl).width + 20);
+        pOutlinedRect(ctx, sx - tw / 2, ty - 22, tw, 26, "#f0b643");
         ctx.textAlign = "center";
         ctx.fillStyle = "#2b1d16";
-        ctx.fillText(lbl, sx, ty - 3);
+        ctx.fillText(lbl, sx, ty - 4);
     } else {
         // Mục tiêu ngoài màn hình -> vẽ mũi tên định hướng ghim sát rìa màn hình
         const cx = canvas.width / 2;
@@ -805,14 +836,14 @@ function drawGuideCompassAndBeacon() {
             : (Math.sin(angle) > 0 ? '⬇' : '⬆');
         const distM = Math.max(1, Math.round(Math.hypot(sx - cx, sy - cy) / 40));
         const lbl = `${arrow} ${target.label} (${distM}m)`;
-        ctx.font = "bold 12px 'Chakra Petch', sans-serif";
-        const tw = Math.max(118, ctx.measureText(lbl).width + 20);
+        ctx.font = "bold 14px 'Chakra Petch', sans-serif";
+        const tw = Math.max(132, ctx.measureText(lbl).width + 22);
         const bx = Math.max(16, Math.min(canvas.width - tw - 16, edgeX - tw / 2));
-        const by = Math.max(114, Math.min(canvas.height - 76, edgeY - 14 + bob * 0.35));
-        pOutlinedRect(ctx, bx, by, tw, 26, "#f0b643");
+        const by = Math.max(114, Math.min(canvas.height - 76, edgeY - 15 + bob * 0.35));
+        pOutlinedRect(ctx, bx, by, tw, 30, "#f0b643");
         ctx.textAlign = "center";
         ctx.fillStyle = "#2b1d16";
-        ctx.fillText(lbl, bx + tw / 2, by + 17);
+        ctx.fillText(lbl, bx + tw / 2, by + 20);
     }
     ctx.restore();
 }
@@ -8693,7 +8724,7 @@ function drawHandbookModal() {
         ctx.fillStyle = '#4a3a35';
         ctx.font = "13px 'Chakra Petch', sans-serif";
         sec.t.forEach((line) => {
-            ctx.fillText(line, 136, ly);
+            ctx.fillText(line, 136, ly, 352);
             ly += 21;
         });
         ly += 14;
@@ -8736,7 +8767,7 @@ function drawHandbookModal() {
         ctx.fillStyle = '#4a3a35';
         ctx.font = "12.5px 'Chakra Petch', sans-serif";
         sec.t.forEach((line) => {
-            ctx.fillText(line, 524, ry);
+            ctx.fillText(line, 524, ry, 352);
             ry += 19;
         });
         ry += 9;
@@ -8982,13 +9013,13 @@ function drawDayNightLightingOverlay() {
 function drawMinimalHUD(locationName) {
     // 1. Cụm Tiền & Thể lực
     pOutlinedRect(ctx, 10, 4, 308, 28, "rgba(236, 211, 171, 0.95)");
-    ctx.font = "bold 13px 'Chakra Petch', sans-serif";
+    ctx.font = "bold 14.5px 'Chakra Petch', sans-serif";
     ctx.fillStyle = "#963420";
     ctx.textAlign = "left";
-    ctx.fillText("💰 " + playerStats.money.toLocaleString('vi-VN') + " đ", 20, 22);
+    ctx.fillText("💰 " + playerStats.money.toLocaleString('vi-VN') + " đ", 18, 23, 162);
 
     ctx.fillStyle = "#c84b31";
-    ctx.fillText("⚡", 184, 22);
+    ctx.fillText("⚡", 184, 23);
     pOutlinedRect(ctx, 204, 11, 104, 14, "#b5a496");
     const eColor = playerStats.energy > 30 ? "#4f8a46" : "#e74c3c";
     pRect(ctx, 206, 13, Math.max(0, (playerStats.energy / playerStats.maxEnergy) * 100), 10, eColor);
@@ -8996,58 +9027,60 @@ function drawMinimalHUD(locationName) {
     // 2. Nút mở Sơ Đồ Khu Phố [M]
     pOutlinedRect(ctx, 324, 4, 126, 28, "#f0b643");
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.font = "bold 13px 'Chakra Petch', sans-serif";
+    ctx.font = "bold 14px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("🗺️ Sơ đồ [M]", 387, 22);
+    ctx.fillText("🗺️ Sơ đồ [M]", 387, 23, 118);
 
     // 3. Kho nguyên liệu pha chế hiện tại (Cà phê, Sữa, Trái cây)
     pOutlinedRect(ctx, 456, 4, 252, 28, "rgba(236, 211, 171, 0.95)");
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.font = "bold 12px 'Chakra Petch', sans-serif";
+    ctx.font = "bold 13.5px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(
         `🫘 Cà phê: ${inventory.coffee}  |  🥫 Sữa: ${inventory.milk}  |  🍊 Cam: ${inventory.fruit}`,
         582,
-        22
+        23,
+        242
     );
 
     // 4. Nút đổi tốc độ thời gian (1x / 2x)
     pOutlinedRect(ctx, 714, 4, 82, 28, playerStats.timeSpeedMultiplier === 2 ? "#e67e22" : "#dfd1b4");
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.font = "bold 12px 'Chakra Petch', sans-serif";
-    ctx.fillText("⏱️ Tốc độ " + playerStats.timeSpeedMultiplier + "x", 755, 22);
+    ctx.font = "bold 13px 'Chakra Petch', sans-serif";
+    ctx.fillText("⏱️ " + playerStats.timeSpeedMultiplier + "x", 755, 23, 74);
 
     // 5. Đồng hồ Năm / Ngày (100 ngày/năm) / Thời tiết & Giờ chuẩn Stardew Valley
     const wInfo = getWeatherInfo();
     pOutlinedRect(ctx, canvas.width - 198, 4, 188, 28, "rgba(236, 211, 171, 0.95)");
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.font = "bold 12px 'Chakra Petch', sans-serif";
+    ctx.font = "bold 13.5px 'Chakra Petch', sans-serif";
     ctx.textAlign = "right";
     ctx.fillText(
         `${wInfo.icon} N${playerStats.year}•Ng${playerStats.dayOfYear}/100 ${formatGameClock(playerStats.hour)}`,
         canvas.width - 16,
-        22
+        23,
+        178
     );
 
     pOutlinedRect(ctx, 840, 40, 148, 28, "#ecd3ab");
     ctx.textAlign = "center";
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.font = "bold 12px 'Chakra Petch', sans-serif";
-    ctx.fillText("📖 Sổ tay [B]", 914, 59);
+    ctx.font = "bold 13.5px 'Chakra Petch', sans-serif";
+    ctx.fillText("📖 Sổ tay [B]", 914, 59, 138);
 
     pOutlinedRect(ctx, 10, 40, 300, 28, "#ecd3ab");
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.font = "bold 12px 'Chakra Petch', sans-serif";
-    ctx.fillText(`🏅 Danh tiếng ${cityReputation}/100 · Chặng ${getNPCSchedulePhase() + 1}/4 · Mục tiêu`, 160, 59, 290);
+    ctx.font = "bold 13.5px 'Chakra Petch', sans-serif";
+    ctx.fillText(`🏅 Danh tiếng ${cityReputation}/100 · Chặng ${getNPCSchedulePhase() + 1}/4 · Mục tiêu`, 160, 59, 288);
 
     drawGuideBarInHUD();
 
     // 6. Nhãn vị trí góc dưới phải
     pOutlinedRect(ctx, canvas.width - 320, canvas.height - 38, 308, 30, "#ecd3ab");
     ctx.fillStyle = PAL.SIGN_RED;
-    ctx.font = "bold 13px 'Chakra Petch', sans-serif";
+    ctx.font = "bold 14px 'Chakra Petch', sans-serif";
     ctx.textAlign = "right";
-    ctx.fillText("📍 " + locationName, canvas.width - 20, canvas.height - 19);
+    ctx.fillText("📍 " + locationName, canvas.width - 20, canvas.height - 18, 294);
 }
 
 // ============================================================================
@@ -9102,8 +9135,8 @@ function drawMarketModal() {
         }
 
         ctx.fillStyle = "#4a3525";
-        ctx.font = "12.5px 'Chakra Petch', sans-serif";
-        ctx.fillText(item.desc, 228, rowY + (showBackpackRow ? 43 : 47));
+        ctx.font = "13px 'Chakra Petch', sans-serif";
+        ctx.fillText(item.desc, 228, rowY + (showBackpackRow ? 43 : 47), 398);
 
         // Nút Mua
         const canBuy = playerStats.money >= price;
@@ -9936,12 +9969,12 @@ function drawInteractionBanner() {
     }
     if (!text) return;
 
-    const promptW = Math.min(760, Math.max(460, text.length * 8.2 + 44));
-    pOutlinedRect(ctx, canvas.width / 2 - promptW / 2, 74, promptW, 34, "#f0b643");
+    const promptW = Math.min(880, Math.max(500, text.length * 9.4 + 48));
+    pOutlinedRect(ctx, canvas.width / 2 - promptW / 2, 74, promptW, 40, "#f0b643");
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.font = "bold 13px 'Chakra Petch', sans-serif";
+    ctx.font = "bold 15.5px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(text, canvas.width / 2, 96);
+    ctx.fillText(text, canvas.width / 2, 100, promptW - 24);
 }
 
 function calendarCell(index) {
@@ -10552,14 +10585,14 @@ function drawToastOverlay() {
     if (toastTimer > 0) {
         toastTimer -= dt;
         const hasBanner = !isAnyModalOpen() && (nearbyInteractable || nearbyRental);
-        const toastY = hasBanner ? 114 : 76;
-        const tw = Math.min(820, toastMessage.length * 8.4 + 48);
-        pOutlinedRect(ctx, canvas.width / 2 - tw / 2, toastY, tw, 34, "#2b1d16");
-        pRect(ctx, canvas.width / 2 - tw / 2 + 2, toastY + 2, tw - 4, 30, "#fff3d6");
+        const toastY = hasBanner ? 120 : 76;
+        const tw = Math.min(940, Math.max(420, toastMessage.length * 9.6 + 56));
+        pOutlinedRect(ctx, canvas.width / 2 - tw / 2, toastY, tw, 42, "#2b1d16");
+        pRect(ctx, canvas.width / 2 - tw / 2 + 2, toastY + 2, tw - 4, 38, "#fff3d6");
         ctx.fillStyle = "#c84b31";
-        ctx.font = "bold 14px 'Chakra Petch', sans-serif";
+        ctx.font = "bold 16px 'Chakra Petch', sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText(toastMessage, canvas.width / 2, toastY + 22);
+        ctx.fillText(toastMessage, canvas.width / 2, toastY + 27, tw - 26);
     }
 }
 
@@ -10975,12 +11008,12 @@ function drawStoryNPCsInWorld() {
             ctx.textAlign = "center";
             ctx.fillText("!", npc.x + 18, npc.y - 28 + bob);
         }
-        ctx.font = "bold 11px 'Chakra Petch', sans-serif";
+        ctx.font = "bold 13px 'Chakra Petch', sans-serif";
         ctx.textAlign = "center";
-        const width = ctx.measureText(npc.name).width + 12;
-        pOutlinedRect(ctx, npc.x + 18 - width / 2, npc.y - 16, width, 16, isDeliveryTarget ? "#ffe066" : "#ecd3ab");
+        const width = ctx.measureText(npc.name).width + 14;
+        pOutlinedRect(ctx, npc.x + 18 - width / 2, npc.y - 20, width, 20, isDeliveryTarget ? "#ffe066" : "#ecd3ab");
         ctx.fillStyle = PAL.OUTLINE;
-        ctx.fillText(npc.name, npc.x + 18, npc.y - 4);
+        ctx.fillText(npc.name, npc.x + 18, npc.y - 6);
     });
 }
 
@@ -11082,17 +11115,17 @@ function drawDialogueModal() {
 
     // Tự động xuống dòng lời thoại tiếng Việt
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.font = "14px 'Chakra Petch', sans-serif";
+    ctx.font = "600 15.5px 'Chakra Petch', sans-serif";
     const words = text.split(' ');
     let line = '';
-    let ly = 526;
+    let ly = 528;
     const maxW = 635;
     for (let i = 0; i < words.length; i++) {
         const testLine = line + words[i] + ' ';
         if (ctx.measureText(testLine).width > maxW && i > 0) {
             ctx.fillText(line.trim(), 244, ly);
             line = words[i] + ' ';
-            ly += 18;
+            ly += 19;
         } else {
             line = testLine;
         }
@@ -11102,20 +11135,20 @@ function drawDialogueModal() {
     // Hàng nút Mời nước tăng điểm thân thiết (tối đa 1 lần/ngày)
     ctx.textAlign = "left";
     ctx.fillStyle = "#7a4424";
-    ctx.font = "bold 11px 'Chakra Petch', sans-serif";
+    ctx.font = "bold 12px 'Chakra Petch', sans-serif";
     if (npc.giftedToday) {
-        ctx.fillText("✅ Hôm nay đã mời nước nhân vật này", 244, 594);
+        ctx.fillText("✅ Hôm nay đã mời nước nhân vật này", 244, 595);
     } else {
-        ctx.fillText("🎁 Mời:", 244, 594);
+        ctx.fillText("🎁 Mời:", 244, 595);
         GAME_CONFIG.RECIPES.forEach((rec, idx) => {
             const bx = 310 + idx * 96;
             const unlocked = isRecipeUnlocked(rec.id);
             const canMake = unlocked && Object.entries(rec.need).every(([ing, amt]) => (inventory[ing] || 0) >= amt);
             pOutlinedRect(ctx, bx, 577, 92, 26, !unlocked ? "#d8cbb5" : (canMake ? "#f7d794" : "#dfd1b4"));
             ctx.fillStyle = canMake ? PAL.OUTLINE : "#8a7c72";
-            ctx.font = "bold 9.5px 'Chakra Petch', sans-serif";
+            ctx.font = "bold 11px 'Chakra Petch', sans-serif";
             ctx.textAlign = "center";
-            ctx.fillText(unlocked ? `${rec.icon} ${rec.name.replace("Cà Phê ", "CF ")}` : "🔒 Chưa mở", bx + 46, 594, 86);
+            ctx.fillText(unlocked ? `${rec.icon} ${rec.name.replace("Cà Phê ", "CF ")}` : "🔒 Chưa mở", bx + 46, 595, 86);
         });
     }
 
@@ -11193,12 +11226,12 @@ function drawMovingBikeTopDown(b) {
 function drawPlayerNameLabel(px, py) {
     const cx = px + 18;
     const cy = py - 10;
-    const w = playerConfig.name.length * 7.5 + 14;
-    pOutlinedRect(ctx, cx - w / 2, cy - 13, w, 18, "#ecd3ab");
+    ctx.font = "bold 13.5px 'Chakra Petch', sans-serif";
+    const w = Math.max(playerConfig.name.length * 8.5 + 16, ctx.measureText(playerConfig.name).width + 16);
+    pOutlinedRect(ctx, cx - w / 2, cy - 16, w, 20, "#ecd3ab");
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.font = "bold 12px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(playerConfig.name, cx, cy);
+    ctx.fillText(playerConfig.name, cx, cy - 1);
 }
 
 function gameLoop(now = performance.now()) {
@@ -11735,13 +11768,14 @@ let updateMobileControlsUI = () => {};
         document.body.classList.toggle('is-landscape', mobileOn && isLandscape);
         document.body.classList.toggle('is-portrait', mobileOn && !isLandscape);
 
-        let availW = vw - (mobileOn ? 8 : 28);
-        let availH = vh - (mobileOn ? 8 : 28);
+        let availW = vw - (mobileOn ? 6 : 28);
+        let availH = vh - (mobileOn ? 6 : 28);
         if (mobileOn && !isLandscape && showPadNow) {
             // Chừa khoảng trống gọn bên dưới canvas cho tay cầm khi xoay dọc
-            availH = Math.max(195, vh - 236);
+            availH = Math.max(210, vh - 204);
         }
         const scale = Math.max(0.28, Math.min(1, availW / 1000, availH / 650));
+        mobileFontBoostPx = (mobileOn || scale < 0.85) ? (scale < 0.55 ? 2.5 : 1.5) : 0;
         const key = `${scale.toFixed(4)}|${mobileOn}|${isLandscape}|${showPadNow}`;
         if (key !== lastLayoutKey) {
             lastLayoutKey = key;
