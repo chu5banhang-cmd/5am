@@ -2704,11 +2704,18 @@ function giftShopItem() {
 }
 
 function drawShopMenu() {
-    pOutlinedRect(ctx, 255, 152, 490, 338, "#ecd3ab");
+    drawStandardModalFrame({
+        x: 255,
+        y: 152,
+        w: 490,
+        h: 338,
+        title: indoorShop.name,
+        titleSize: 17,
+        closeButton: false
+    });
     ctx.textAlign = "center";
-    ctx.font = "bold 18px 'Chakra Petch', sans-serif";
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.fillText(indoorShop.name, 500, 190, 420);
+    ctx.font = "bold 13px 'Chakra Petch', sans-serif";
     indoorShop.menu.forEach((item, index) => {
         const [name, price, action, value] = item;
         const y = 218 + index * 54;
@@ -2892,10 +2899,17 @@ function drawManagementModal() {
     const daysLeftRent = getDaysUntilNextRent();
     const isOverdue = Boolean(business?.rentOverdue && business?.overdueAmount > 0);
     pRect(ctx, 0, 0, canvas.width, canvas.height, "rgba(20,14,10,0.8)");
-    pOutlinedRect(ctx, 170, 72, 660, 514, "#ecd3ab");
-    ctx.textAlign = "center"; ctx.fillStyle = PAL.OUTLINE;
-    ctx.font = "bold 20px 'Chakra Petch', sans-serif";
-    ctx.fillText(`Quản lý · ${bType.name}`, 500, 108);
+    drawStandardModalFrame({
+        x: 170,
+        y: 72,
+        w: 660,
+        h: 514,
+        title: `QUẢN LÝ · ${bType.name}`,
+        titleSize: 18,
+        closeButton: false
+    });
+    ctx.textAlign = "center";
+    ctx.fillStyle = PAL.OUTLINE;
     ctx.font = "bold 12.5px 'Chakra Petch', sans-serif";
     ctx.fillText(`Uy tín quán ${customerReputation}/100 · Danh tiếng TP ${cityReputation}/100 (Chuẩn ngành: ${bType.idealRep}) · Công suất khách: ${repPct}%`, 500, 134, 620);
     ctx.fillStyle = isOverdue ? "#c0392b" : "#5d4037";
@@ -2927,7 +2941,8 @@ function drawManagementModal() {
         ctx.fillText(`💳 Bấm để đóng tiền mặt bằng quá hạn (${moneyLabel(business.overdueAmount)}) & Mở lại quán`, 500, 496, 540);
         ctx.fillStyle = PAL.OUTLINE;
     }
-    pOutlinedRect(ctx, 420, 524, 160, 36, "#f0b643");
+    pOutlinedRect(ctx, 420, 524, 160, 36, "#c84b31");
+    ctx.fillStyle = "#ffffff";
     ctx.fillText("Đóng [Q]", 500, 548);
 }
 
@@ -2978,9 +2993,16 @@ function handleManagementClick(x,y) {
 
 function drawBankModal() {
     pRect(ctx,0,0,canvas.width,canvas.height,"rgba(20,14,10,0.8)");
-    pOutlinedRect(ctx,170,105,660,445,"#ecd3ab");
+    drawStandardModalFrame({
+        x: 170,
+        y: 105,
+        w: 660,
+        h: 445,
+        title: "🏦 VIETBANK · VAY VỐN KHỞI NGHIỆP",
+        titleSize: 18,
+        closeButton: false
+    });
     ctx.textAlign="center";ctx.fillStyle=PAL.OUTLINE;
-    ctx.font="bold 21px 'Chakra Petch', sans-serif";ctx.fillText("VietBank · Vay vốn khởi nghiệp",500,145);
     ctx.font="bold 14px 'Chakra Petch', sans-serif";
     ctx.fillText(`Nợ ${moneyLabel(bankDebt)} · Trả mỗi sáng ${moneyLabel(dailyLoanPayment)} · Uy tín tín dụng ${creditScore}`,500,178,610);
     loanProducts.forEach((loan,index)=>{
@@ -2991,7 +3013,7 @@ function drawBankModal() {
     });
     pOutlinedRect(ctx,350,430,300,42,"#aaca8c");
     ctx.fillText("Chọn khoản vay · Nhấn E để xác nhận",500,457);
-    pOutlinedRect(ctx,420,493,160,34,"#f0b643");ctx.fillText("Đóng [Q]",500,516);
+    pOutlinedRect(ctx,420,493,160,34,"#c84b31");ctx.fillStyle="#ffffff";ctx.fillText("Đóng [Q]",500,516);
 }
 
 function handleBankClick(x,y){
@@ -5855,13 +5877,20 @@ function drawFestivalPanel() {
     const festival = getTodayFestival();
     if (!festival) return;
     pRect(ctx, 0, 0, canvas.width, canvas.height, "rgba(24,18,15,0.78)");
-    pOutlinedRect(ctx, 135, 110, 730, 420, "#fff3d6");
+    drawStandardModalFrame({
+        x: 135,
+        y: 110,
+        w: 730,
+        h: 420,
+        title: festival.name,
+        titleSize: 20,
+        closeButton: false
+    });
     ctx.textAlign = "center";
-    ctx.fillStyle = PAL.SIGN_RED;
-    ctx.font = "bold 24px 'Chakra Petch', sans-serif";
-    ctx.fillText(festival.name, 500, 170, 530);
+    pOutlinedRect(ctx, 775, 124, 87, 35, '#c84b31');
+    ctx.fillStyle = '#ffffff';
     ctx.font = "bold 13px 'Chakra Petch', sans-serif";
-    ctx.fillText("Đóng [Q]", 818, 148);
+    ctx.fillText("ĐÓNG [Q]", 818, 147);
     ctx.fillStyle = PAL.OUTLINE;
     ctx.font = "bold 16px 'Chakra Petch', sans-serif";
     if (playerStats.hour < 9 || playerStats.hour >= 21) {
@@ -6655,11 +6684,17 @@ function checkDeliveryExpiration() {
 
 function drawDeliveryModal() {
     pRect(ctx, 0, 0, canvas.width, canvas.height, "rgba(20,14,10,0.82)");
-    pOutlinedRect(ctx, 170, 84, 660, 472, "#ecd3ab");
+    drawStandardModalFrame({
+        x: 170,
+        y: 84,
+        w: 660,
+        h: 472,
+        title: "🛵 NHẬN ĐƠN GIAO HÀNG LIÊN KHU [F]",
+        titleSize: 18,
+        closeButton: false
+    });
     ctx.textAlign = "center";
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.font = "bold 20px 'Chakra Petch', sans-serif";
-    ctx.fillText("🛵 Nhận Đơn Giao Hàng Liên Khu [F]", 500, 120);
     const curZoneName = GAME_CONFIG.ZONES[currentZone]?.name || currentZone;
     ctx.font = "bold 13px 'Chakra Petch', sans-serif";
     ctx.fillText(`Vị trí hiện tại: ${curZoneName} · Đã giao hôm nay: ${deliveryCompletedToday} đơn`, 500, 146, 620);
@@ -6721,10 +6756,12 @@ function drawDeliveryModal() {
     if (!activeDeliveryOrder) {
         pOutlinedRect(ctx, 240, 496, 220, 38, "#d9c29c");
         ctx.fillText("🔄 Đổi đơn mới", 350, 520);
-        pOutlinedRect(ctx, 540, 496, 220, 38, "#f0b643");
+        pOutlinedRect(ctx, 540, 496, 220, 38, "#c84b31");
+        ctx.fillStyle = "#ffffff";
         ctx.fillText("Đóng [Q / F]", 650, 520);
     } else {
-        pOutlinedRect(ctx, 410, 496, 180, 38, "#f0b643");
+        pOutlinedRect(ctx, 410, 496, 180, 38, "#c84b31");
+        ctx.fillStyle = "#ffffff";
         ctx.fillText("Đóng [Q / F]", 500, 520);
     }
 }
@@ -8209,15 +8246,15 @@ function drawYearSummaryModal() {
         pRect(ctx, px, py, i % 3 === 0 ? 4 : 2, 2, 'rgba(255, 224, 150, 0.52)');
     }
 
-    pRect(ctx, 118, 48, 772, 558, 'rgba(10, 8, 14, 0.55)');
-    pOutlinedRect(ctx, 110, 40, 780, 558, '#e4b965');
-    pOutlinedRect(ctx, 120, 50, 760, 538, '#fff4dc');
-    pRect(ctx, 132, 62, 736, 56, '#4d3941');
-
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffe3aa';
-    ctx.font = "bold 23px 'Chakra Petch', sans-serif";
-    ctx.fillText('🏆 TỔNG KẾT NĂM 1 · 100 NGÀY KHỞI NGHIỆP 5AM', 500, 98);
+    drawStandardModalFrame({
+        x: 110,
+        y: 40,
+        w: 780,
+        h: 558,
+        title: '🏆 TỔNG KẾT NĂM 1 · 100 NGÀY KHỞI NGHIỆP 5AM',
+        titleSize: 19,
+        closeButton: false
+    });
 
     const rank = getBaristaRank();
     const rentedCount = Object.keys(rentedProperties).length;
@@ -8681,20 +8718,29 @@ function drawHandbookModal() {
     pOutlinedRect(ctx, 502, 96, 384, 458, '#fff5df');
     pRect(ctx, 496, 94, 8, 462, '#9e6c4f'); // Gáy sổ
     pRect(ctx, 148, 86, 18, 28, '#c84b31');  // Dải đánh dấu trang
+    drawStandardModalHeader({
+        x: 100,
+        y: 85,
+        w: 800,
+        title: '📖 SỔ TAY KHỞI NGHIỆP 5AM',
+        titleAlign: 'left',
+        titleSize: 17,
+        closeButton: false
+    });
 
     // Nút đóng góc phải trên
-    pOutlinedRect(ctx, 808, 104, 64, 30, '#e8c488');
+    pOutlinedRect(ctx, 808, 104, 64, 30, '#c84b31');
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#493437';
+    ctx.fillStyle = '#ffffff';
     ctx.font = "bold 12px 'Chakra Petch', sans-serif";
     ctx.fillText('Đóng [Q]', 840, 123);
 
     // Trang trái
     ctx.textAlign = 'left';
     ctx.fillStyle = '#8b3a2b';
-    ctx.font = "bold 18px 'Chakra Petch', sans-serif";
-    ctx.fillText('📖 SỔ TAY KHỞI NGHIỆP 5AM', 136, 134);
-    pRect(ctx, 136, 143, 336, 2, '#d9b98c');
+    ctx.font = "bold 14px 'Chakra Petch', sans-serif";
+    ctx.fillText('BẮT ĐẦU KINH DOANH', 136, 158);
+    pRect(ctx, 136, 165, 336, 2, '#d9b98c');
 
     const leftLines = [
         { h: '1. Nhịp sống 05:00 - 24:00', t: [
@@ -8715,7 +8761,7 @@ function drawHandbookModal() {
         ]}
     ];
 
-    let ly = 172;
+    let ly = 184;
     leftLines.forEach((sec) => {
         ctx.fillStyle = '#5c382c';
         ctx.font = "bold 14px 'Chakra Petch', sans-serif";
@@ -8732,9 +8778,9 @@ function drawHandbookModal() {
 
     // Trang phải
     ctx.fillStyle = '#8b3a2b';
-    ctx.font = "bold 18px 'Chakra Petch', sans-serif";
-    ctx.fillText('☕ THỂ LỆ & MẸO KINH DOANH', 524, 134);
-    pRect(ctx, 524, 143, 270, 2, '#d9b98c');
+    ctx.font = "bold 14px 'Chakra Petch', sans-serif";
+    ctx.fillText('☕ THỂ LỆ & MẸO KINH DOANH', 524, 158);
+    pRect(ctx, 524, 165, 270, 2, '#d9b98c');
 
     const rightLines = [
         { h: '3. Pha chế & Phục vụ khách', t: [
@@ -8758,7 +8804,7 @@ function drawHandbookModal() {
         ]}
     ];
 
-    let ry = 166;
+    let ry = 180;
     rightLines.forEach((sec) => {
         ctx.fillStyle = '#5c382c';
         ctx.font = "bold 13.5px 'Chakra Petch', sans-serif";
@@ -8776,14 +8822,15 @@ function drawHandbookModal() {
 
 function drawSettingsModal() {
     pRect(ctx, 0, 0, canvas.width, canvas.height, 'rgba(16, 15, 23, 0.78)');
-    pRect(ctx, 252, 155, 500, 350, 'rgba(17, 13, 18, 0.48)');
-    pOutlinedRect(ctx, 242, 145, 516, 354, '#e4b965');
-    pOutlinedRect(ctx, 250, 153, 500, 338, '#f2dfbd');
-    pRect(ctx, 262, 165, 476, 52, '#4d3941');
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffe3aa';
-    ctx.font = "bold 23px 'Chakra Petch', sans-serif";
-    ctx.fillText('CÀI ĐẶT', 500, 198);
+    drawStandardModalFrame({
+        x: 242,
+        y: 145,
+        w: 516,
+        h: 354,
+        title: '⚙️ CÀI ĐẶT',
+        titleSize: 20,
+        closeButton: false
+    });
     ctx.fillStyle = '#674a3b';
     ctx.font = "bold 16px 'Chakra Petch', sans-serif";
     ctx.fillText('Âm lượng âm thanh', 500, 257);
@@ -8971,6 +9018,35 @@ function drawArrowButton(x, y, text) {
 }
 
 // Hiệu ứng màu bầu trời theo khung giờ + thời tiết Sài Gòn (Nắng gắt, Mưa rào, Bão lớn)
+function drawZoneColorGradeOverlay() {
+    // Mỗi khu có một sắc độ nhận diện riêng, phủ nhẹ để vẫn giữ được màu pixel gốc.
+    const zoneGrades = {
+        HOME_STREET: ['#e8a85e', 0.045],       // vàng ấm, khu phố thân quen
+        BETTER_STREET: ['#b8cf91', 0.05],      // xanh dịu, khu dân cư khá giả
+        VILLAS: ['#70aa70', 0.075],            // xanh vườn cây
+        CANAL_MARKET: ['#55aaa5', 0.075],      // xanh ngọc ven kênh
+        DOWNTOWN: ['#86a8c5', 0.065],          // xanh kính và đá đô thị
+        OFFICE_DISTRICT: ['#788eae', 0.085],   // xanh thép công sở
+        DISTRICT_1: ['#d276a9', 0.07],         // hồng tím phố đêm
+        PARK: ['#c8d98a', 0.055],              // xanh non công viên
+        ELDERLY_AREA: ['#c28b79', 0.065],      // đất nung phố cổ
+        BREEZE_AREA: ['#55bdc9', 0.085],       // xanh biển đón gió
+        DALAT_NIGHT: ['#9678bf', 0.09],        // tím chợ đêm
+        DALAT_GREENHOUSE: ['#83c99a', 0.075],  // xanh nhà kính
+        DALAT_PINE: ['#638b79', 0.08],         // xanh thông mát
+        MEKONG_QUAY: ['#4aa6a2', 0.075],       // xanh sông nước
+        MEKONG_FLOATING: ['#7eaa5b', 0.07],    // xanh miệt vườn
+        MEKONG_CRAFT: ['#d2a35d', 0.07],       // vàng tre và gỗ
+        VUNGTAU_BAI_SAU: ['#e6c477', 0.065],   // nắng cát
+        VUNGTAU_FISHING: ['#56abb3', 0.075],   // xanh chợ cá
+        VUNGTAU_LIGHTHOUSE: ['#7799bd', 0.085] // xanh biển sâu
+    };
+    const grade = zoneGrades[currentZone];
+    if (!grade) return;
+    pRect(ctx, 0, 0, canvas.width, canvas.height,
+        `rgba(${parseInt(grade[0].slice(1, 3), 16)}, ${parseInt(grade[0].slice(3, 5), 16)}, ${parseInt(grade[0].slice(5, 7), 16)}, ${grade[1]})`);
+}
+
 function drawDayNightLightingOverlay() {
     const h = playerStats.hour;
     if (h >= 5.0 && h < 6.5) {
@@ -9011,6 +9087,11 @@ function drawDayNightLightingOverlay() {
 }
 
 function drawMinimalHUD(locationName) {
+    const isMobileHUD = document.body.classList.contains('is-mobile');
+    if (isMobileHUD) {
+        // One shared backplate makes the separate pixel panels read as a single HUD.
+        pOutlinedRect(ctx, 4, 0, canvas.width - 8, 72, "rgba(43, 29, 22, 0.78)");
+    }
     // 1. Cụm Tiền & Thể lực
     pOutlinedRect(ctx, 10, 4, 308, 28, "rgba(236, 211, 171, 0.95)");
     ctx.font = "bold 14.5px 'Chakra Petch', sans-serif";
@@ -9019,7 +9100,7 @@ function drawMinimalHUD(locationName) {
     ctx.fillText("💰 " + playerStats.money.toLocaleString('vi-VN') + " đ", 18, 23, 162);
 
     ctx.fillStyle = "#c84b31";
-    ctx.fillText("⚡", 184, 23);
+    ctx.fillText(isMobileHUD ? `⚡${Math.round(playerStats.energy)}` : "⚡", 184, 23);
     pOutlinedRect(ctx, 204, 11, 104, 14, "#b5a496");
     const eColor = playerStats.energy > 30 ? "#4f8a46" : "#e74c3c";
     pRect(ctx, 206, 13, Math.max(0, (playerStats.energy / playerStats.maxEnergy) * 100), 10, eColor);
@@ -9037,7 +9118,9 @@ function drawMinimalHUD(locationName) {
     ctx.font = "bold 13.5px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(
-        `🫘 Cà phê: ${inventory.coffee}  |  🥫 Sữa: ${inventory.milk}  |  🍊 Cam: ${inventory.fruit}`,
+        isMobileHUD
+            ? `☕ ${inventory.coffee}  ·  🥛 ${inventory.milk}  ·  🍊 ${inventory.fruit}`
+            : `🫘 Cà phê: ${inventory.coffee}  |  🥫 Sữa: ${inventory.milk}  |  🍊 Cam: ${inventory.fruit}`,
         582,
         23,
         242
@@ -9071,35 +9154,70 @@ function drawMinimalHUD(locationName) {
     pOutlinedRect(ctx, 10, 40, 300, 28, "#ecd3ab");
     ctx.fillStyle = PAL.OUTLINE;
     ctx.font = "bold 13.5px 'Chakra Petch', sans-serif";
-    ctx.fillText(`🏅 Danh tiếng ${cityReputation}/100 · Chặng ${getNPCSchedulePhase() + 1}/4 · Mục tiêu`, 160, 59, 288);
+    ctx.fillText(
+        isMobileHUD
+            ? `🏅 TP ${cityReputation}/100 · Chặng ${getNPCSchedulePhase() + 1}/4`
+            : `🏅 Danh tiếng ${cityReputation}/100 · Chặng ${getNPCSchedulePhase() + 1}/4 · Mục tiêu`,
+        160,
+        59,
+        288
+    );
 
     drawGuideBarInHUD();
 
-    // 6. Nhãn vị trí góc dưới phải
-    pOutlinedRect(ctx, canvas.width - 320, canvas.height - 38, 308, 30, "#ecd3ab");
-    ctx.fillStyle = PAL.SIGN_RED;
-    ctx.font = "bold 14px 'Chakra Petch', sans-serif";
-    ctx.textAlign = "right";
-    ctx.fillText("📍 " + locationName, canvas.width - 20, canvas.height - 18, 294);
+    // Mobile controls already show the available actions and occupy the lower corners.
+    if (!isMobileHUD) {
+        pOutlinedRect(ctx, canvas.width - 320, canvas.height - 38, 308, 30, "#ecd3ab");
+        ctx.fillStyle = PAL.SIGN_RED;
+        ctx.font = "bold 14px 'Chakra Petch', sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText("📍 " + locationName, canvas.width - 20, canvas.height - 18, 294);
+    }
 }
 
 // ============================================================================
 // CÁC BẢNG MODAL TƯƠNG TÁC: CHỢ CÔ BA, PHA CHẾ CÀ PHÊ & NGỦ TỔNG KẾT NGÀY
 // ============================================================================
 
+function drawStandardModalHeader({ x, y, w, title, titleAlign = 'center', titleSize = 17, titleColor = '#f0b643', headerColor = '#2b1d16', closeButton = true }) {
+    pOutlinedRect(ctx, x + 8, y + 8, w - 16, 40, headerColor);
+
+    ctx.fillStyle = titleColor;
+    ctx.font = `bold ${titleSize}px 'Chakra Petch', sans-serif`;
+    ctx.textAlign = titleAlign;
+    ctx.fillText(title, titleAlign === 'left' ? x + 18 : x + w / 2, y + 34, w - (titleAlign === 'left' ? 70 : 72));
+
+    if (closeButton) {
+        pOutlinedRect(ctx, x + w - 42, y + 10, 30, 28, "#c84b31");
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 13px 'Chakra Petch', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("✖", x + w - 27, y + 29);
+    }
+}
+
+function drawStandardModalFrame(options) {
+    const { x, y, w, h } = options;
+    pRect(ctx, x + 5, y + 5, w, h, "rgba(20, 14, 10, 0.45)");
+    pOutlinedRect(ctx, x, y, w, h, "#ecd3ab");
+    pOutlinedRect(ctx, x + 8, y + 8, w - 16, h - 16, "#fff6e5");
+    drawStandardModalHeader(options);
+}
+
 function drawMarketModal() {
     if (!showMarketModal) return;
     const isEarly = playerStats.hour < GAME_CONFIG.TIME.EARLY_MARKET_BONUS_HOUR;
 
     pRect(ctx, 0, 0, canvas.width, canvas.height, "rgba(20, 14, 10, 0.76)");
-    pOutlinedRect(ctx, 170, 80, 660, 480, "#ecd3ab");
-    pOutlinedRect(ctx, 180, 90, 640, 460, "#fff6e5");
-
-    pOutlinedRect(ctx, 180, 90, 640, 52, "#4f8a46");
-    ctx.fillStyle = "#fff6e5";
-    ctx.font = "bold 20px 'Chakra Petch', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("🛒 SẠP TẠP HÓA CÔ BA - CHỢ SỚM HẺM 54", canvas.width / 2, 123);
+    drawStandardModalFrame({
+        x: 170,
+        y: 80,
+        w: 660,
+        h: 480,
+        title: "🛒 SẠP TẠP HÓA CÔ BA - CHỢ SỚM HẺM 54",
+        titleSize: 18,
+        closeButton: false
+    });
 
     ctx.fillStyle = isEarly ? "#27ae60" : "#963420";
     ctx.font = "bold 13px 'Chakra Petch', sans-serif";
@@ -9140,7 +9258,7 @@ function drawMarketModal() {
 
         // Nút Mua
         const canBuy = playerStats.money >= price;
-        pOutlinedRect(ctx, 635, rowY + (showBackpackRow ? 8 : 11), 140, 40, canBuy ? "#c84b31" : "#95a5a6");
+        pOutlinedRect(ctx, 635, rowY + (showBackpackRow ? 8 : 11), 140, 40, canBuy ? "#4f8a46" : "#95a5a6");
         ctx.fillStyle = "#ffffff";
         ctx.font = "bold 14px 'Chakra Petch', sans-serif";
         ctx.textAlign = "center";
@@ -9165,7 +9283,7 @@ function drawMarketModal() {
         ctx.fillText("MUA: 250.000đ", 705, bpY + 33);
     }
 
-    pOutlinedRect(ctx, 430, 492, 140, 42, "#2b1d16");
+    pOutlinedRect(ctx, 430, 492, 140, 42, "#c84b31");
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 14px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
@@ -9219,22 +9337,15 @@ function drawBrewModal() {
     const waitingHere = spotId ? getWaitingCustomersAtSpot(spotId) : [];
     const rank = getBaristaRank();
 
-    pRect(ctx, mx + 5, my + 5, mw, mh, "rgba(20, 14, 10, 0.45)");
-    pOutlinedRect(ctx, mx, my, mw, mh, "#ecd3ab");
-    pOutlinedRect(ctx, mx + 6, my + 6, mw - 12, mh - 12, "#fff6e5");
-
-    // Header gọn + nút đóng [✖]
-    pOutlinedRect(ctx, mx + 6, my + 6, mw - 12, 36, PAL.SIGN_RED);
-    ctx.fillStyle = "#f0b643";
-    ctx.font = "bold 13.5px 'Chakra Petch', sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText(`☕ MENU (${unlockedCount}/${recipes.length} món · x${Number(mult.toFixed(2))} · Lv.${rank.level})`, mx + 16, my + 29, mw - 64);
-
-    pOutlinedRect(ctx, mx + mw - 42, my + 10, 30, 28, "#2b1d16");
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 13px 'Chakra Petch', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("✖", mx + mw - 27, my + 29);
+    drawStandardModalFrame({
+        x: mx,
+        y: my,
+        w: mw,
+        h: mh,
+        title: `☕ MENU (${unlockedCount}/${recipes.length} món · x${Number(mult.toFixed(2))} · Lv.${rank.level})`,
+        titleAlign: 'left',
+        titleSize: 13.5
+    });
 
     // Thanh trạng thái khách đang gọi món
     pOutlinedRect(ctx, mx + 14, my + 48, mw - 28, 28, waitingHere.length > 0 ? "#e8f6e8" : "#fbeee6");
@@ -9378,20 +9489,19 @@ function drawSleepSummaryModal() {
     const boxY = chooseSlotOnSleep ? 72 : 95;
 
     pRect(ctx, 0, 0, canvas.width, canvas.height, "rgba(12, 9, 7, 0.88)");
-    pOutlinedRect(ctx, 210, boxY, 580, boxH, "#ecd3ab");
-    pOutlinedRect(ctx, 222, boxY + 12, 556, boxH - 24, "#fff6e5");
-
-    pOutlinedRect(ctx, 222, boxY + 12, 556, 54, faintedInHospital ? "#7d2020" : "#2b1d16");
-    ctx.fillStyle = faintedInHospital ? "#ffd7d7" : "#f0b643";
-    ctx.font = "bold 22px 'Chakra Petch', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(
-        faintedInHospital
-            ? "🏥 NHẬP VIỆN CẤP CỨU - TỔNG KẾT NGÀY " + playerStats.day
+    drawStandardModalFrame({
+        x: 210,
+        y: boxY,
+        w: 580,
+        h: boxH,
+        title: faintedInHospital
+            ? "🏥 NHẬP VIỆN CẤP CỨU · TỔNG KẾT NGÀY " + playerStats.day
             : "🌙 SỔ TAY TỔNG KẾT CUỐI NGÀY " + playerStats.day,
-        canvas.width / 2,
-        boxY + 47
-    );
+        titleSize: 16,
+        titleColor: faintedInHospital ? "#ffd7d7" : "#f0b643",
+        headerColor: faintedInHospital ? "#7d2020" : "#2b1d16",
+        closeButton: false
+    });
 
     const rowBase = boxY + 96;
     const rowStep = faintedInHospital ? 30 : 36;
@@ -9624,14 +9734,15 @@ function drawRentalModal() {
     const canAfford = playerStats.money >= r.price && hasRequiredReputation;
 
     pRect(ctx, 0, 0, canvas.width, canvas.height, "rgba(20, 14, 10, 0.72)");
-    pOutlinedRect(ctx, 220, 130, 560, 360, "#ecd3ab");
-    pOutlinedRect(ctx, 230, 140, 540, 340, "#fff6e5");
-
-    pOutlinedRect(ctx, 230, 140, 540, 48, PAL.SIGN_RED);
-    ctx.fillStyle = "#f0b643";
-    ctx.font = "bold 20px 'Chakra Petch', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("📋 HỒ SƠ MẶT BẰNG KINH DOANH", canvas.width / 2, 171);
+    drawStandardModalFrame({
+        x: 220,
+        y: 130,
+        w: 560,
+        h: 360,
+        title: "📋 HỒ SƠ MẶT BẰNG KINH DOANH",
+        titleSize: 17,
+        closeButton: false
+    });
 
     ctx.fillStyle = PAL.OUTLINE;
     ctx.textAlign = "left";
@@ -9728,14 +9839,25 @@ function getCurrentProvinceMap() {
 function drawNPCSchedulePanel() {
     const phase = getNPCSchedulePhase();
     pRect(ctx, 0, 0, canvas.width, canvas.height, "rgba(20, 14, 10, 0.78)");
-    pOutlinedRect(ctx, 32, 70, 936, 510, "#ecd3ab");
+    drawStandardModalFrame({
+        x: 32,
+        y: 70,
+        w: 936,
+        h: 510,
+        title: '👥 LỊCH NHÂN VẬT',
+        titleAlign: 'left',
+        titleSize: 18,
+        closeButton: false
+    });
     ctx.textAlign = "left";
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.font = "bold 22px 'Chakra Petch', sans-serif";
-    ctx.fillText("Lịch nhân vật", 54, 108);
     ctx.font = "bold 14px 'Chakra Petch', sans-serif";
     ctx.fillText(`Giai đoạn ${phase + 1}/4 · Ngày ${phase * 25 + 1}–${(phase + 1) * 25} · Hiện tại ${formatGameClock(playerStats.hour)}`, 54, 137);
-    ctx.fillText("Đóng [L / Q]", 836, 108);
+    pOutlinedRect(ctx, 825, 84, 121, 34, '#c84b31');
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = "bold 13px 'Chakra Petch', sans-serif";
+    ctx.fillText("ĐÓNG [L / Q]", 885, 106);
 
     npcScheduleZones.forEach((zone, index) => {
         const x = 54 + (index % 5) * 179;
@@ -9791,15 +9913,20 @@ function handleNPCScheduleClick(x, y) {
 function drawMapModal() {
     if (!showMapModal) return;
     pRect(ctx, 0, 0, canvas.width, canvas.height, "rgba(20, 14, 10, 0.78)");
-    pOutlinedRect(ctx, 35, 45, 930, 545, "#ecd3ab");
-    pOutlinedRect(ctx, 45, 55, 910, 525, "#fff6e5");
-
     const provinceMap = currentGameState === GAME_STATES.PLAYING_STREET ? getCurrentProvinceMap() : null;
+    drawStandardModalFrame({
+        x: 35,
+        y: 45,
+        w: 930,
+        h: 545,
+        title: provinceMap
+            ? `🗺️ ${provinceMap.title}`
+            : "🗺️ SƠ ĐỒ CÁC KHU PHỐ & HỆ SỐ GIÁ BÁN (CLICK ĐỂ DI CHUYỂN NHANH)",
+        titleSize: provinceMap ? 20 : 16,
+        closeButton: false
+    });
+
     if (provinceMap) {
-        ctx.fillStyle = PAL.OUTLINE;
-        ctx.font = "bold 23px 'Chakra Petch', sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(`🗺️ ${provinceMap.title}`, canvas.width / 2, 111);
         ctx.strokeStyle = '#6c5542';
         ctx.lineWidth = 7;
         ctx.beginPath();
@@ -9829,11 +9956,6 @@ function drawMapModal() {
         ctx.fillText('Sơ đồ chỉ cho chuyển nhanh bên trong tỉnh trong ngày xe khách.', canvas.width / 2, 530);
         return;
     }
-
-    ctx.fillStyle = PAL.OUTLINE;
-    ctx.font = "bold 22px 'Chakra Petch', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("🗺️ SƠ ĐỒ CÁC KHU PHỐ & HỆ SỐ GIÁ BÁN (CLICK ĐỂ DI CHUYỂN NHANH)", canvas.width / 2, 92);
 
     ctx.strokeStyle = PAL.OUTLINE;
     ctx.lineWidth = 5;
@@ -9985,14 +10107,23 @@ function drawWallCalendar() {
     if (!showWallCalendar) return;
     const firstDay = getNPCSchedulePhase() * 25 + 1;
     pRect(ctx, 0, 0, canvas.width, canvas.height, "rgba(20, 14, 10, 0.78)");
-    pOutlinedRect(ctx, 40, 62, 920, 540, "#ecd3ab");
+    drawStandardModalFrame({
+        x: 40,
+        y: 62,
+        w: 920,
+        h: 540,
+        title: `📅 NĂM ${playerStats.year} · NGÀY ${firstDay}–${firstDay + 24}`,
+        titleAlign: 'left',
+        titleSize: 18,
+        closeButton: false
+    });
     ctx.textAlign = "left";
     ctx.fillStyle = PAL.OUTLINE;
-    ctx.font = "bold 23px 'Chakra Petch', sans-serif";
-    ctx.fillText(`Năm ${playerStats.year} · Ngày ${firstDay}–${firstDay + 24}`, 61, 106);
-    ctx.textAlign = "right";
+    pOutlinedRect(ctx, 835, 83, 105, 35, '#c84b31');
+    ctx.textAlign = "center";
+    ctx.fillStyle = '#ffffff';
     ctx.font = "bold 14px 'Chakra Petch', sans-serif";
-    ctx.fillText("Đóng [Q]", 935, 105);
+    ctx.fillText("ĐÓNG [Q]", 887, 106);
     ensureChapterProgress();
     const goal = getCurrentChapterGoal();
     const goalProgress = chapterProgress.completed ? goal.target : chapterProgress.value;
@@ -10190,15 +10321,16 @@ function handlePCModalClick(mx, my) {
 function drawPCModal() {
     if (!showPCModal) return;
     pRect(ctx, 0, 0, canvas.width, canvas.height, "rgba(18, 14, 16, 0.80)");
-    pOutlinedRect(ctx, 140, 80, 720, 485, "#4d3941");
-    pOutlinedRect(ctx, 152, 92, 696, 461, "#fff6e5");
-
-    // Header
-    pRect(ctx, 156, 96, 688, 34, "#3a5a68");
-    ctx.textAlign = "left";
-    ctx.fillStyle = "#ffe3aa";
-    ctx.font = "bold 17px 'Chakra Petch', sans-serif";
-    ctx.fillText("💻 MÁY TÍNH CHỦ QUÁN · SỔ KẾ TOÁN & KHO LẠNH", 174, 119);
+    drawStandardModalFrame({
+        x: 140,
+        y: 80,
+        w: 720,
+        h: 485,
+        title: "💻 MÁY TÍNH CHỦ QUÁN · SỔ KẾ TOÁN & KHO LẠNH",
+        titleAlign: 'left',
+        titleSize: 16,
+        closeButton: false
+    });
 
     pOutlinedRect(ctx, 776, 96, 72, 32, "#c84b31");
     ctx.textAlign = "center";
@@ -10345,14 +10477,15 @@ function drawTVModal() {
         .sort((a, b) => a.day - b.day)[0];
 
     pRect(ctx, 0, 0, canvas.width, canvas.height, "rgba(18, 14, 16, 0.78)");
-    pOutlinedRect(ctx, 200, 120, 600, 400, "#5d4037");
-    pOutlinedRect(ctx, 214, 134, 572, 372, "#fff5df");
-    pRect(ctx, 224, 144, 552, 46, "#3a5a68");
-
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#ffe3aa";
-    ctx.font = "bold 20px 'Chakra Petch', sans-serif";
-    ctx.fillText("📺 BẢN TIN DỰ BÁO THỜI TIẾT SÀI GÒN", 500, 174);
+    drawStandardModalFrame({
+        x: 200,
+        y: 120,
+        w: 600,
+        h: 400,
+        title: "📺 BẢN TIN DỰ BÁO THỜI TIẾT SÀI GÒN",
+        titleSize: 17,
+        closeButton: false
+    });
 
     // Khung Hôm nay
     pOutlinedRect(ctx, 238, 208, 250, 160, "#f3e4c4");
@@ -10505,7 +10638,79 @@ function drawVungTauMarketKeepers() {
     }
 }
 
+function drawRegionalAtmosphereInWorld() {
+    // Điểm bắt sáng dịch chuyển nhẹ trên tán cây, giúp nền tĩnh có cảm giác đung đưa.
+    const treeCanopies = {
+        HOME_STREET: [[150, 360, 1.1], [670, 370, 1.05], [1760, 360, 1.15], [380, 950, 1.2], [1420, 960, 1.2]],
+        BETTER_STREET: [[640, 360, 1.15], [1160, 360, 1.15], [815, 940, 1.25]],
+        DOWNTOWN: [[490, 940, 1.2], [1680, 940, 1.2]],
+        OFFICE_DISTRICT: [[520, 940, 1.2]],
+        PARK: [[180, 360, 1.2], [740, 360, 1.2], [1180, 360, 1.2], [1740, 360, 1.2], [1300, 940, 1.25], [1620, 940, 1.25]],
+        ELDERLY_AREA: [[320, 860, 1.25], [740, 860, 1.25]],
+        VILLAS: [[1880, 140, 1.15], [1880, 370, 1.15]]
+    };
+    const canopies = treeCanopies[currentZone] || [];
+    canopies.forEach(([x, y, scale], index) => {
+        const sway = Math.round(Math.sin(tickCount * 0.035 + index * 1.7) * 3);
+        // Bóng tán cây xê dịch nhẹ trên nền, tạo lớp chiều sâu chuyển động.
+        pRect(ctx, x - 29 * scale + sway, y + 7 * scale, 58 * scale, 14 * scale, 'rgba(35, 42, 30, 0.08)');
+        const leafX = x - 20 * scale + sway;
+        const leafY = y - 100 * scale + (index % 2) * 8;
+        pRect(ctx, leafX, leafY, 18 * scale, 4 * scale, 'rgba(190, 222, 112, 0.28)');
+        pRect(ctx, leafX + 27 * scale, leafY + 19 * scale, 12 * scale, 3 * scale, 'rgba(225, 231, 145, 0.22)');
+    });
+
+    // Hoa giấy rơi theo gió ở phố cổ và công viên.
+    if (currentZone === 'ELDERLY_AREA' || currentZone === 'PARK' || currentZone === 'HOME_STREET') {
+        const blossoms = currentZone === 'ELDERLY_AREA'
+            ? [[320, 860], [740, 860]]
+            : currentZone === 'PARK' ? [[180, 360], [740, 360], [1180, 360], [1740, 360]] : [[670, 370]];
+        blossoms.forEach(([x, y], treeIndex) => {
+            for (let i = 0; i < 4; i++) {
+                const phase = (tickCount * 0.45 + i * 17 + treeIndex * 9) % 92;
+                const px = x + Math.round(Math.sin(phase * 0.08 + i) * (16 + phase * 0.35));
+                const py = y - 75 + phase;
+                pRect(ctx, px, py, 3, 3, currentZone === 'ELDERLY_AREA' ? '#e9a6bd' : '#f4c0cf');
+                if (i % 2 === 0) pRect(ctx, px + 3, py + 1, 2, 2, 'rgba(255, 232, 210, 0.78)');
+            }
+        });
+    }
+
+    // Đom đóm lập lòe ở các khoảng xanh khi chiều xuống.
+    if ((currentZone === 'PARK' || currentZone === 'VILLAS' || currentZone === 'DALAT_PINE') && playerStats.hour >= 17) {
+        for (let i = 0; i < 13; i++) {
+            const phase = tickCount * 0.04 + i * 1.9;
+            const x = 90 + (i * 149) % 1810 + Math.round(Math.sin(phase) * 8);
+            const y = 500 + (i * 83) % 530 + Math.round(Math.cos(phase * 0.8) * 7);
+            const glow = 0.28 + (Math.sin(phase * 1.7) + 1) * 0.2;
+            ctx.fillStyle = `rgba(255, 231, 137, ${glow.toFixed(2)})`;
+            ctx.fillRect(x - 2, y - 2, 5, 5);
+            ctx.fillStyle = `rgba(255, 245, 194, ${(glow * 0.9).toFixed(2)})`;
+            ctx.fillRect(x, y, 2, 2);
+        }
+    }
+
+    // Gợn sáng trên sông và kênh, chuyển động riêng theo nhịp nước miền Tây.
+    if (currentZone === 'MEKONG_QUAY' || currentZone === 'MEKONG_FLOATING' || currentZone === 'MEKONG_CRAFT') {
+        const waterTop = currentZone === 'MEKONG_FLOATING' ? 801 : currentZone === 'MEKONG_QUAY' ? 1010 : 1010;
+        for (let i = 0; i < 18; i++) {
+            const x = (i * 127 + tickCount * (i % 2 ? 0.8 : -0.45) + WORLD_W * 2) % WORLD_W;
+            const y = waterTop + 18 + (i * 37) % 220;
+            const width = 9 + (i % 4) * 4;
+            pRect(ctx, Math.round(x), y, width, 2, i % 3 === 0 ? 'rgba(231, 245, 208, 0.52)' : 'rgba(173, 220, 200, 0.38)');
+        }
+    }
+
+    // Ánh nắng lướt qua kính nhà kính Đà Lạt.
+    if (currentZone === 'DALAT_GREENHOUSE') {
+        const glintX = Math.round(120 + (tickCount * 1.7) % 1680);
+        pRect(ctx, glintX, 733, 30, 3, 'rgba(255, 255, 225, 0.48)');
+        pRect(ctx, glintX + 8, 741, 14, 2, 'rgba(255, 255, 255, 0.34)');
+    }
+}
+
 function drawZoneAmbientEffectsInWorld() {
+    drawRegionalAtmosphereInWorld();
     if (currentZone.startsWith('VUNGTAU_')) {
         const phase = tickCount * 0.035;
         for (let x = -40; x < WORLD_W; x += 96) {
@@ -10555,6 +10760,25 @@ function drawZoneAmbientEffectsInWorld() {
         if (currentZone !== 'PARK') streetMotorbikes.forEach((b) => drawMovingBikeTopDown(b));
     }
 
+    // Vũng nước nhỏ phản chiếu đèn và trời âm u trên đường ở hai khu phố chính.
+    if ((currentZone === 'HOME_STREET' || currentZone === 'BETTER_STREET') &&
+        (playerStats.weather === 'RAIN' || playerStats.weather === 'STORM')) {
+        const isNight = playerStats.hour >= 18;
+        const shimmer = Math.floor(tickCount / 9) % 3;
+        const puddles = [
+            [356, 548, 42, 9], [782, 632, 56, 10], [1010, 555, 38, 8],
+            [1328, 646, 48, 9], [1718, 568, 44, 8]
+        ];
+        puddles.forEach(([x, y, width, height], index) => {
+            pRect(ctx, x, y, width, height, 'rgba(31, 47, 57, 0.42)');
+            pRect(ctx, x + 4, y + 2, width - 8, height - 4,
+                isNight ? 'rgba(232, 177, 91, 0.24)' : 'rgba(173, 208, 216, 0.25)');
+            const glintX = x + 7 + ((shimmer + index * 11) % Math.max(1, width - 14));
+            pRect(ctx, glintX, y + 2, 5, 2,
+                isNight ? 'rgba(255, 224, 153, 0.75)' : 'rgba(239, 249, 246, 0.72)');
+        });
+    }
+
     // Khách đi dạo và cư dân có lịch hẹn
     drawStreetCustomersInWorld();
     drawStoryNPCsInWorld();
@@ -10562,10 +10786,21 @@ function drawZoneAmbientEffectsInWorld() {
     // Quầng sáng đèn đường ấm áp khi trời tối (>= 18:00)
     if (playerStats.hour >= 18.0) {
         [220, 640, 1140, 1620].forEach((lx) => {
-            pRect(ctx, lx - 48, 455, 96, 65, "rgba(255, 214, 110, 0.18)");
-            pRect(ctx, lx - 48, 670, 96, 65, "rgba(255, 214, 110, 0.18)");
+            const pulse = 0.13 + (Math.sin(tickCount * 0.035 + lx) + 1) * 0.025;
+            // Quầng sáng bậc pixel loang từ chân đèn xuống vỉa hè.
+            for (const lampY of [455, 670]) {
+                ctx.fillStyle = `rgba(255, 202, 112, ${pulse.toFixed(3)})`;
+                ctx.fillRect(lx - 28, lampY + 3, 56, 12);
+                ctx.fillStyle = `rgba(255, 202, 112, ${(pulse * 0.72).toFixed(3)})`;
+                ctx.fillRect(lx - 40, lampY + 15, 80, 13);
+                ctx.fillStyle = `rgba(255, 202, 112, ${(pulse * 0.42).toFixed(3)})`;
+                ctx.fillRect(lx - 48, lampY + 28, 96, 20);
+                ctx.fillStyle = `rgba(255, 202, 112, ${(pulse * 0.2).toFixed(3)})`;
+                ctx.fillRect(lx - 34, lampY + 48, 68, 13);
+            }
         });
     }
+
 }
 
 function drawFloatingTextsInWorld() {
@@ -10643,6 +10878,20 @@ function drawCoffeeCartInWorld() {
     pOutlinedRect(ctx, cx + 8, cy + 42, 16, 16, "#262626");
     pOutlinedRect(ctx, cx + 62, cy + 42, 16, 16, "#262626");
 
+    // Hơi cà phê bốc lên thành các cụm pixel nhỏ khi xe đang mở bán.
+    if (coffeeCart.isOpen && !coffeeCart.isPushed && !coffeeCart.seized) {
+        for (let i = 0; i < 2; i++) {
+            const phase = (Math.floor(tickCount / 7) + i * 5) % 10;
+            const vaporX = cx + 26 + i * 32 + (phase % 3) * 2;
+            const vaporY = cy - 54 - phase * 3;
+            const alpha = 0.48 - phase * 0.035;
+            ctx.fillStyle = `rgba(255, 245, 220, ${alpha.toFixed(2)})`;
+            ctx.fillRect(vaporX, vaporY, 5, 2);
+            ctx.fillRect(vaporX + (phase % 2 ? 2 : -2), vaporY - 4, 4, 2);
+            if (phase < 6) ctx.fillRect(vaporX - 2, vaporY - 8, 3, 2);
+        }
+    }
+
     if (coffeeCart.umbrella) {
         pRect(ctx, cx + 42, cy - 84, 4, 36, "#6f4e37");
         pOutlinedRect(ctx, cx - 18, cy - 96, 124, 18, "#2e7d32");
@@ -10715,13 +10964,20 @@ function handleGarageClick(x, y) {
 
 function drawGarage() {
     pRect(ctx, 0, 0, canvas.width, canvas.height, "rgba(20,14,10,0.76)");
-    pOutlinedRect(ctx, 236, 105, 528, 385, "#ecd3ab");
+    drawStandardModalFrame({
+        x: 236,
+        y: 105,
+        w: 528,
+        h: 385,
+        title: "🛵 XE CÁ NHÂN",
+        titleSize: 18,
+        closeButton: false
+    });
+    pOutlinedRect(ctx, 688, 114, 77, 38, '#c84b31');
     ctx.textAlign = "center";
-    ctx.fillStyle = PAL.OUTLINE;
-    ctx.font = "bold 22px 'Chakra Petch', sans-serif";
-    ctx.fillText("Xe cá nhân", 500, 145);
+    ctx.fillStyle = "#ffffff";
     ctx.font = "bold 14px 'Chakra Petch', sans-serif";
-    ctx.fillText("Đóng [Q]", 722, 138);
+    ctx.fillText("ĐÓNG [Q]", 726, 138);
     getGarageOptions().forEach((vehicle, index) => {
         const y = 190 + index * 51;
         pOutlinedRect(ctx, 267, y, 466, 43, vehicle === activeVehicle ? "#f0b643" : "#fff3d6");
@@ -10920,24 +11176,27 @@ function drawStreet() {
 
     ctx.restore();
 
-    // 2. Lớp phủ ánh sáng Bình minh / Hoàng hôn / Đêm
+    // 2. Tông màu riêng cho từng khu, sau đó phủ ánh sáng theo giờ và thời tiết.
+    drawZoneColorGradeOverlay();
     drawDayNightLightingOverlay();
 
     // 3. Giao diện HUD cố định trên màn hình
     const zInfo = GAME_CONFIG.ZONES[currentZone];
     const hasShip = hasDeliveryVehicle();
-    pOutlinedRect(ctx, 14, canvas.height - 38, 656, 30, "#ecd3ab");
-    ctx.font = "bold 12px 'Chakra Petch', sans-serif";
-    ctx.fillStyle = PAL.OUTLINE;
-    ctx.textAlign = "left";
-    ctx.fillText(
-        hasShip
-            ? "[E] Tương tác | [F] Ship hàng | [G] Xe cà phê | [V] Xe cá nhân | [M] Sơ đồ"
-            : "[E] Tương tác | [G] Xe cà phê | [V] Xe cá nhân | [M] Sơ đồ",
-        24,
-        canvas.height - 19,
-        636
-    );
+    if (!document.body.classList.contains('is-mobile')) {
+        pOutlinedRect(ctx, 14, canvas.height - 38, 656, 30, "#ecd3ab");
+        ctx.font = "bold 12px 'Chakra Petch', sans-serif";
+        ctx.fillStyle = PAL.OUTLINE;
+        ctx.textAlign = "left";
+        ctx.fillText(
+            hasShip
+                ? "[E] Tương tác | [F] Ship hàng | [G] Xe cà phê | [V] Xe cá nhân | [M] Sơ đồ"
+                : "[E] Tương tác | [G] Xe cà phê | [V] Xe cá nhân | [M] Sơ đồ",
+            24,
+            canvas.height - 19,
+            636
+        );
+    }
 
     if (activeDeliveryOrder) {
         const atTarget = currentZone === activeDeliveryOrder.zoneKey;
