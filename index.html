@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=VT323&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=mobile-hud-2">
+    <link rel="stylesheet" href="style.css?v=mobile-hit-layout-2">
 </head>
 <body>
 
@@ -52,16 +52,12 @@
 
         <div id="mobileControls" hidden aria-label="Điều khiển cảm ứng">
             <div class="mobile-topbar">
-                <div class="mobile-topbar-left">
-                    <button type="button" class="touch-chip touch-chip-fs" id="btnTouchFullscreen" aria-label="Toàn màn hình">⛶ Toàn màn hình</button>
-                    <button type="button" class="touch-chip" data-key="m" id="btnTouchM">🗺️ Bản đồ</button>
-                    <button type="button" class="touch-chip" data-key="b" id="btnTouchB">📖 Sổ tay</button>
-                </div>
-                <div class="mobile-topbar-right">
-                    <button type="button" class="touch-chip" data-key="v" id="btnTouchV">🛵 Xe</button>
-                    <button type="button" class="touch-chip" data-key="f" id="btnTouchF" hidden>📦 Ship</button>
-                    <button type="button" class="touch-chip" data-key="k" id="btnTouchK" hidden>⚙️ Quản lý</button>
-                </div>
+                <button type="button" class="touch-chip" data-key="m" id="btnTouchM">🗺️ Bản đồ</button>
+                <button type="button" class="touch-chip" data-key="b" id="btnTouchB">📖 Sổ tay</button>
+                <button type="button" class="touch-chip" data-key="v" id="btnTouchV">🛵 Xe</button>
+                <button type="button" class="touch-chip" data-key="f" id="btnTouchF" hidden>📦 Ship</button>
+                <button type="button" class="touch-chip" data-key="k" id="btnTouchK" hidden>⚙️ Quản lý</button>
+                <button type="button" class="touch-chip" id="btnTouchFullscreen">⛶ Toàn màn hình</button>
             </div>
             <div class="mobile-pad-row">
                 <div class="joystick-zone">
@@ -93,6 +89,6 @@
     <script src="constants.js?v=font-1"></script>
     <script src="audio.js?v=font-1"></script>
     <script src="cloud.js?v=font-1"></script>
-    <script src="game.js?v=mobile-hud-2"></script>
+    <script src="game.js?v=mobile-hit-layout-2"></script>
 </body>
 </html>

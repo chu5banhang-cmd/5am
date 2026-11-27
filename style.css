@@ -1,7 +1,6 @@
 /* style.css - Giao diện Pixel Art Sài Gòn Hoài Cổ (Warm Vintage Palette) */
 :root {
     --game-scale: 1;
-    --hud-safe-top: 52px;
 }
 
 * {
@@ -52,7 +51,6 @@ body {
 
 .game-container {
     position: relative;
-    box-sizing: content-box;
     flex-shrink: 0;
     width: calc(1000px * var(--game-scale));
     height: calc(650px * var(--game-scale));
@@ -82,17 +80,12 @@ canvas {
 
 #playerFormFields {
     position: absolute;
-    top: 20%;
-    left: 35.6%;
-    width: 509px;
-    height: 72px;
-    transform: scale(var(--game-scale));
-    transform-origin: top left;
+    top: 20.77%;
+    left: 34.4%;
+    width: 53.3%;
     display: none;
-    grid-template-columns: 1.35fr 1fr;
-    align-items: center;
-    gap: 14px;
-    padding: 0 4px;
+    grid-template-columns: 1fr 1fr;
+    gap: calc(16px * var(--game-scale));
     z-index: 10;
 }
 
@@ -101,17 +94,16 @@ canvas {
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: calc(4px * var(--game-scale));
     color: #6a5147;
     font-family: 'Chakra Petch', monospace;
     font-weight: 700;
-    font-size: 13px;
+    font-size: max(12px, calc(13px * var(--game-scale)));
 }
 
 .player-field label,
 #playerBirthdayField label {
-    line-height: 1.15;
-    white-space: nowrap;
+    line-height: 1.25;
 }
 
 #playerBirthdayField[hidden] {
@@ -122,11 +114,11 @@ canvas {
     position: static;
     transform: none;
     width: 100%;
-    height: 40px;
-    padding: 4px 10px;
+    height: max(30px, calc(37px * var(--game-scale)));
+    padding: calc(5px * var(--game-scale)) calc(8px * var(--game-scale));
     font-family: 'Chakra Petch', monospace;
     font-weight: 700;
-    font-size: 16px;
+    font-size: max(14px, calc(16px * var(--game-scale)));
     text-align: center;
     border: 2px solid #52372f;
     box-shadow: 3px 3px 0 #34262a, inset 0 2px 0 rgba(255, 255, 255, 0.48);
@@ -149,16 +141,15 @@ canvas {
 
 #playerBirthdayInput {
     width: 100%;
-    height: 40px;
-    padding: 4px 10px;
+    height: max(30px, calc(37px * var(--game-scale)));
+    padding: calc(4px * var(--game-scale)) calc(8px * var(--game-scale));
     border: 2px solid #52372f;
     box-shadow: 3px 3px 0 #34262a, inset 0 2px 0 rgba(255, 255, 255, 0.48);
     background: #fff6e5;
     color: #3d2a2b;
     font-family: 'Chakra Petch', monospace;
     font-weight: 700;
-    font-size: 16px;
-    text-align: center;
+    font-size: max(14px, calc(16px * var(--game-scale)));
     user-select: text;
     -webkit-user-select: text;
 }
@@ -317,37 +308,6 @@ body.is-mobile #toggleMobilePadBtn {
     display: none;
 }
 
-body.is-mobile.is-portrait.is-char-create {
-    align-items: flex-start;
-    overflow-y: auto;
-}
-
-body.is-mobile.is-portrait.is-char-create #appShell {
-    padding-top: max(16px, 5dvh);
-    padding-bottom: 130px;
-}
-
-body.is-mobile.is-portrait #playerFormFields {
-    position: absolute;
-    top: calc(100% + 12px);
-    left: 50%;
-    width: min(calc(100vw - 16px), 460px);
-    height: auto;
-    transform: translateX(-50%);
-    transform-origin: center top;
-    grid-template-columns: 1.35fr 1fr;
-    align-items: end;
-    gap: 10px;
-    padding: 10px 12px;
-    background: #f6e7c7;
-    border: 3px solid #e4b965;
-    outline: 2px solid #3d2a2b;
-    border-radius: 10px;
-    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55);
-    z-index: 15;
-    touch-action: manipulation;
-}
-
 #mobileControls {
     width: min(100vw - 8px, 640px);
     display: flex;
@@ -371,11 +331,6 @@ body.is-mobile.is-portrait #playerFormFields {
     flex-wrap: wrap;
     justify-content: center;
     gap: 6px;
-}
-
-.mobile-topbar-left,
-.mobile-topbar-right {
-    display: contents;
 }
 
 .touch-chip {
@@ -524,7 +479,7 @@ body.is-mobile.is-portrait #playerFormFields {
     box-shadow: 0 0 12px rgba(240, 182, 67, 0.65), 0 3px 0 #2b1d16;
 }
 
-/* Landscape: keep the playfield and top HUD bar clear by docking controls on side rails below the HUD. */
+/* Landscape: keep the playfield clear and reserve touch controls for the edges. */
 body.is-mobile.is-landscape #appShell {
     width: 100%;
     height: 100%;
@@ -536,8 +491,7 @@ body.is-mobile.is-landscape #mobileControls {
     inset: 0;
     width: 100%;
     height: 100%;
-    padding: 0 max(8px, env(safe-area-inset-right, 8px)) max(8px, env(safe-area-inset-bottom, 8px)) max(8px, env(safe-area-inset-left, 8px));
-    gap: 6px;
+    padding: max(4px, env(safe-area-inset-top, 4px)) max(8px, env(safe-area-inset-right, 8px)) max(8px, env(safe-area-inset-bottom, 8px)) max(8px, env(safe-area-inset-left, 8px));
     background: transparent;
     border: none;
     box-shadow: none;
@@ -546,27 +500,15 @@ body.is-mobile.is-landscape #mobileControls {
 }
 
 body.is-mobile.is-landscape .mobile-topbar {
-    padding: var(--hud-safe-top, 52px) 0 0 0;
-    flex-wrap: nowrap;
-    justify-content: space-between;
-    align-items: flex-start;
-    width: 100%;
-}
-
-body.is-mobile.is-landscape .mobile-topbar-left {
-    display: flex;
+    position: absolute;
+    top: max(8px, env(safe-area-inset-top, 8px));
+    left: max(8px, env(safe-area-inset-left, 8px));
+    width: min(108px, 14vw);
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
+    justify-content: center;
     gap: 6px;
-    pointer-events: none;
-}
-
-body.is-mobile.is-landscape .mobile-topbar-right {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 6px;
-    pointer-events: none;
+    padding: 0;
 }
 
 /* Map and handbook are already tappable in the canvas HUD. */
@@ -588,9 +530,9 @@ body.is-mobile.is-landscape .mobile-pad-row {
 }
 
 body.is-mobile.is-landscape #touchJoystick {
-    width: clamp(72px, 15vh, 100px);
-    height: clamp(72px, 15vh, 100px);
-    opacity: 0.78;
+    width: clamp(84px, 16vh, 112px);
+    height: clamp(84px, 16vh, 112px);
+    opacity: 0.9;
 }
 
 body.is-mobile.is-landscape #touchJoystickKnob {
@@ -600,49 +542,124 @@ body.is-mobile.is-landscape #touchJoystickKnob {
 }
 
 body.is-mobile.is-landscape .action-cluster {
-    max-width: min(42vw, 300px);
-    gap: 5px;
-    opacity: 0.88;
+    width: min(108px, 14vw);
+    max-width: min(108px, 14vw);
+    align-items: stretch;
+    gap: 6px;
+    opacity: 0.94;
 }
 
 body.is-mobile.is-landscape .action-secondary-row,
 body.is-mobile.is-landscape .action-primary-row {
+    flex-direction: column;
+    flex-wrap: nowrap;
     gap: 5px;
 }
 
 body.is-mobile.is-landscape .touch-chip {
-    min-width: 64px;
-    padding: 5px 8px;
-    border-radius: 10px;
-    border: 2px solid rgba(217, 173, 98, 0.9);
-    background: rgba(38, 27, 24, 0.86);
-    color: #fff3d6;
-    font-size: clamp(10.5px, 2.2vh, 12px);
-    line-height: 1.15;
-    white-space: nowrap;
+    width: 100%;
+    min-height: 34px;
+    padding: 5px 6px;
+    font-size: clamp(10px, 2.2vh, 12px);
+    line-height: 1.1;
     text-align: center;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.48);
-}
-
-body.is-mobile.is-landscape .touch-chip:active,
-body.is-mobile.is-landscape .touch-chip.active {
-    background: #f0b643;
-    color: #2b1d16;
-    border-color: #fff3d6;
 }
 
 body.is-mobile.is-landscape .touch-btn-main {
     min-width: 0;
-    padding: 7px 9px;
+    width: 100%;
+    min-height: 42px;
+    padding: 7px 6px;
     font-size: clamp(11px, 2.4vh, 13px);
 }
 
 body.is-mobile.is-landscape .touch-btn-close {
-    padding: 6px 9px;
+    width: 100%;
+    min-height: 42px;
+    padding: 6px;
     font-size: clamp(10px, 2.2vh, 12px);
 }
 
 body.is-mobile.is-landscape .touch-btn-sub {
-    padding: 5px 7px;
+    width: 100%;
+    min-height: 38px;
+    padding: 5px 6px;
     font-size: clamp(10px, 2.1vh, 11px);
+}
+
+/* Android: slightly larger touch targets; iOS keeps its existing proven sizing. */
+body.is-mobile.is-portrait.is-android #mobileControls {
+    gap: 8px;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+}
+
+body.is-mobile.is-portrait.is-android #touchJoystick {
+    width: 128px;
+    height: 128px;
+}
+
+body.is-mobile.is-portrait.is-android #touchJoystickKnob {
+    width: 56px;
+    height: 56px;
+    margin: -28px 0 0 -28px;
+}
+
+body.is-mobile.is-portrait.is-android .touch-chip {
+    min-height: 38px;
+    padding: 7px 10px;
+    font-size: 14px;
+}
+
+body.is-mobile.is-portrait.is-android .touch-btn {
+    min-height: 44px;
+    font-size: 15px;
+}
+
+body.is-mobile.is-portrait.is-android .touch-btn-sub {
+    padding: 8px 10px;
+}
+
+body.is-mobile.is-portrait.is-android .touch-btn-main {
+    min-width: 132px;
+    padding: 12px 16px;
+}
+
+body.is-mobile.is-landscape.is-android #touchJoystick {
+    width: clamp(88px, 19vh, 120px);
+    height: clamp(88px, 19vh, 120px);
+    opacity: 0.94;
+}
+
+body.is-mobile.is-landscape.is-android #touchJoystickKnob {
+    width: 48px;
+    height: 48px;
+    margin: -24px 0 0 -24px;
+}
+
+body.is-mobile.is-landscape.is-android .action-cluster {
+    width: min(108px, 14vw);
+    max-width: min(108px, 14vw);
+    align-items: stretch;
+    gap: 7px;
+    opacity: 0.95;
+}
+
+body.is-mobile.is-landscape.is-android .action-secondary-row,
+body.is-mobile.is-landscape.is-android .action-primary-row {
+    gap: 6px;
+}
+
+body.is-mobile.is-landscape.is-android .touch-chip {
+    min-height: 34px;
+    padding: 5px 8px;
+    font-size: clamp(12px, 2.5vh, 14px);
+}
+
+body.is-mobile.is-landscape.is-android .touch-btn-main,
+body.is-mobile.is-landscape.is-android .touch-btn-close,
+body.is-mobile.is-landscape.is-android .touch-btn-sub {
+    width: 100%;
+    min-height: 42px;
+    padding: 8px 10px;
+    font-size: clamp(12px, 2.6vh, 14px);
 }

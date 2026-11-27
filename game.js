@@ -7098,6 +7098,7 @@ canvas.addEventListener('click', function (event) {
     const scaleY = canvas.height / rect.height;
     const mouseX = (event.clientX - rect.left) * scaleX;
     const mouseY = (event.clientY - rect.top) * scaleY;
+    const mobileTouchUI = document.body.classList.contains('is-mobile');
 
     if (busScene) return;
     if (showYearSummaryModal) {
@@ -7208,37 +7209,28 @@ canvas.addEventListener('click', function (event) {
             currentGameState = GAME_STATES.CHARACTER_CREATION;
         }
     } else if (currentGameState === GAME_STATES.CHARACTER_CREATION) {
-        const isPortraitMobile = document.body.classList.contains('is-mobile') && document.body.classList.contains('is-portrait');
-        if (isPortraitMobile && mouseX >= 344 && mouseX <= 877 && mouseY >= 94 && mouseY <= 208) {
-            const targetInput = mouseX < 650 ? nameInput : birthdayInput;
-            if (targetInput) {
-                targetInput.focus();
-                targetInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-            return;
-        }
-        if (mouseY >= 226 && mouseY <= 270) {
-            if (mouseX >= 502 && mouseX <= 552) {
+        if (mouseY >= 219 && mouseY <= 251) {
+            if (mouseX >= 460 && mouseX <= 492) {
                 playerConfig.genderIndex = (playerConfig.genderIndex - 1 + playerConfig.genders.length) % playerConfig.genders.length;
-            } else if (mouseX >= 806 && mouseX <= 858) {
+            } else if (mouseX >= 754 && mouseX <= 786) {
                 playerConfig.genderIndex = (playerConfig.genderIndex + 1) % playerConfig.genders.length;
             }
         }
-        if (mouseY >= 296 && mouseY <= 340) {
-            if (mouseX >= 502 && mouseX <= 552) {
+        if (mouseY >= 296 && mouseY <= 328) {
+            if (mouseX >= 460 && mouseX <= 492) {
                 playerConfig.outfitIndex = (playerConfig.outfitIndex - 1 + playerConfig.outfits.length) % playerConfig.outfits.length;
-            } else if (mouseX >= 806 && mouseX <= 858) {
+            } else if (mouseX >= 754 && mouseX <= 786) {
                 playerConfig.outfitIndex = (playerConfig.outfitIndex + 1) % playerConfig.outfits.length;
             }
         }
-        if (mouseY >= 366 && mouseY <= 410) {
-            if (mouseX >= 502 && mouseX <= 552) {
+        if (mouseY >= 373 && mouseY <= 405) {
+            if (mouseX >= 460 && mouseX <= 492) {
                 playerConfig.accessoryIndex = (playerConfig.accessoryIndex - 1 + playerConfig.accessories.length) % playerConfig.accessories.length;
-            } else if (mouseX >= 806 && mouseX <= 858) {
+            } else if (mouseX >= 754 && mouseX <= 786) {
                 playerConfig.accessoryIndex = (playerConfig.accessoryIndex + 1) % playerConfig.accessories.length;
             }
         }
-        if (mouseX >= 472 && mouseX <= 748 && mouseY >= 468 && mouseY <= 529) {
+        if (mouseX >= 476 && mouseX <= 752 && mouseY >= 488 && mouseY <= 549) {
             if (!birthdayInput.reportValidity()) return;
             playerConfig.birthday = birthdayInput.valueAsNumber;
             let customName = nameInput.value.trim();
@@ -7315,7 +7307,8 @@ canvas.addEventListener('click', function (event) {
             handleDeliveryModalClick(mouseX, mouseY);
             return;
         }
-        if (mouseX >= 840 && mouseX <= 988 && mouseY >= 40 && mouseY <= 68) {
+        if (mouseX >= (mobileTouchUI ? 828 : 840) && mouseX <= (mobileTouchUI ? 998 : 988) &&
+            mouseY >= (mobileTouchUI ? 36 : 40) && mouseY <= (mobileTouchUI ? 74 : 68)) {
             if (showHandbookModal && handbookTab === 'guide') {
                 showHandbookModal = false;
                 GameAudio?.playModalClose();
@@ -7328,7 +7321,7 @@ canvas.addEventListener('click', function (event) {
             return;
         }
         if (!indoorShop?.name.includes("BỆNH VIỆN") && !isAnyModalOpen() &&
-            mouseX >= 318 && mouseX <= 832 && mouseY >= 40 && mouseY <= 68) {
+            mouseX >= 318 && mouseX <= 832 && mouseY >= (mobileTouchUI ? 36 : 40) && mouseY <= (mobileTouchUI ? 74 : 68)) {
             if (isTutorialActive() && mouseX >= 768 && mouseX <= 830) {
                 tutorialSkipped = true;
                 GameAudio?.playClick();
@@ -7455,13 +7448,15 @@ canvas.addEventListener('click', function (event) {
             handleNPCScheduleClick(mouseX, mouseY);
             return;
         }
-        if (mouseX >= 10 && mouseX <= 310 && mouseY >= 40 && mouseY <= 68) {
+        if (mouseX >= (mobileTouchUI ? 0 : 10) && mouseX <= (mobileTouchUI ? 315 : 310) &&
+            mouseY >= (mobileTouchUI ? 36 : 40) && mouseY <= (mobileTouchUI ? 74 : 68)) {
             openWallCalendar();
             return;
         }
 
         // 2. Click nút mở Bản Đồ Sơ Đồ [M] trên thanh HUD
-        if (mouseX >= 324 && mouseX <= 450 && mouseY >= 4 && mouseY <= 34) {
+        if (mouseX >= (mobileTouchUI ? 310 : 324) && mouseX <= (mobileTouchUI ? 460 : 450) &&
+            mouseY >= (mobileTouchUI ? 0 : 4) && mouseY <= (mobileTouchUI ? 36 : 30)) {
             const nextState = !showMapModal;
             closeAllModals();
             showMapModal = nextState;
@@ -7469,7 +7464,8 @@ canvas.addEventListener('click', function (event) {
         }
 
         // 3. Click nút chỉnh tốc độ thời gian (1x / 2x) góc phải trên HUD
-        if (mouseX >= 714 && mouseX <= 796 && mouseY >= 4 && mouseY <= 34) {
+        if (mouseX >= (mobileTouchUI ? 700 : 715) && mouseX <= (mobileTouchUI ? 810 : 795) &&
+            mouseY >= (mobileTouchUI ? 0 : 4) && mouseY <= (mobileTouchUI ? 36 : 30)) {
             playerStats.timeSpeedMultiplier = (playerStats.timeSpeedMultiplier === 1) ? 2 : 1;
             showToast("⏱️ Tốc độ thời gian: " + playerStats.timeSpeedMultiplier + "x (" +
                 (playerStats.timeSpeedMultiplier === 1 ? "9.5 phút/ngày chuẩn Stardew" : "4.75 phút/ngày nhanh") + ")");
@@ -8913,66 +8909,50 @@ function drawCharacterCreation() {
     ctx.font = "bold 12px 'Chakra Petch', sans-serif";
     ctx.fillText('XEM TRƯỚC', 211, 427);
 
-    // Bảng thông tin bên phải; input tên/ngày sinh nằm trong khung hồ sơ (hoặc bên dưới canvas ở chế độ dọc).
-    pOutlinedRect(ctx, 344, 94, 533, 114, '#f6e7c7');
-    pRect(ctx, 352, 101, 517, 24, '#ead0a4');
+    // Bảng thông tin bên phải; input tên/ngày sinh nằm trong hai dòng mở đầu.
+    pOutlinedRect(ctx, 344, 98, 533, 100, '#f6e7c7');
+    pRect(ctx, 352, 106, 517, 25, '#ead0a4');
     ctx.textAlign = 'center';
     ctx.fillStyle = '#70463d';
     ctx.font = "bold 13px 'Chakra Petch', sans-serif";
-    ctx.fillText('HỒ SƠ CHỦ QUÁN', 610, 118);
-
-    if (document.body.classList.contains('is-mobile') && document.body.classList.contains('is-portrait')) {
-        pOutlinedRect(ctx, 358, 134, 286, 62, '#fff6e5');
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#6a5147';
-        ctx.font = "bold 12px 'Chakra Petch', sans-serif";
-        ctx.fillText('TÊN CHỦ QUÁN', 501, 154);
-        ctx.fillStyle = '#3d2a2b';
-        ctx.font = "bold 16px 'Chakra Petch', sans-serif";
-        ctx.fillText(nameInput?.value.trim() || 'Chủ Quán', 501, 180, 270);
-
-        pOutlinedRect(ctx, 656, 134, 207, 62, '#fff6e5');
-        ctx.fillStyle = '#6a5147';
-        ctx.font = "bold 12px 'Chakra Petch', sans-serif";
-        ctx.fillText('NGÀY SINH', 759, 154);
-        ctx.fillStyle = '#3d2a2b';
-        ctx.font = "bold 16px 'Chakra Petch', sans-serif";
-        ctx.fillText(`Ngày ${birthdayInput?.value || 1}/100`, 759, 180, 190);
-    }
+    ctx.fillText('HỒ SƠ CHỦ QUÁN', 610, 123);
 
     const rows = [
-        { label: 'GIỚI TÍNH', value: playerConfig.genders[playerConfig.genderIndex], top: 218, chip: '#9d7180' },
-        { label: 'TRANG PHỤC', value: playerConfig.outfits[playerConfig.outfitIndex].name, top: 288, chip: '#5f8291' },
-        { label: 'PHỤ KIỆN', value: playerConfig.accessories[playerConfig.accessoryIndex].name, top: 358, chip: '#a67843' }
+        { label: 'GIỚI TÍNH', value: playerConfig.genders[playerConfig.genderIndex], y: 231, chip: '#9d7180' },
+        { label: 'TRANG PHỤC', value: playerConfig.outfits[playerConfig.outfitIndex].name, y: 308, chip: '#5f8291' },
+        { label: 'PHỤ KIỆN', value: playerConfig.accessories[playerConfig.accessoryIndex].name, y: 385, chip: '#a67843' }
     ];
     rows.forEach((row) => {
-        const cy = row.top + 30;
-        pOutlinedRect(ctx, 344, row.top, 533, 60, '#f3e4c4');
-        pRect(ctx, 356, row.top + 11, 6, 38, row.chip);
+        pOutlinedRect(ctx, 344, row.y - 26, 533, 61, '#f3e4c4');
+        pRect(ctx, 357, row.y - 15, 6, 38, row.chip);
         ctx.fillStyle = '#6a5147';
-        ctx.font = "bold 12.5px 'Chakra Petch', sans-serif";
+        ctx.font = "bold 12px 'Chakra Petch', sans-serif";
         ctx.textAlign = 'left';
-        ctx.fillText(row.label, 372, cy + 5, 130);
-        drawArrowButton(528, cy, '‹');
-        pOutlinedRect(ctx, 556, cy - 19, 248, 38, '#fff8e8');
+        ctx.fillText(row.label, 374, row.y - 6);
+        pOutlinedRect(ctx, 522, row.y - 17, 226, 39, '#fff8e8');
         ctx.textAlign = 'center';
         ctx.fillStyle = '#994e3d';
         ctx.font = "bold 16px 'Chakra Petch', sans-serif";
-        ctx.fillText(row.value, 680, cy + 6, 232);
-        drawArrowButton(832, cy, '›');
+        ctx.fillText(row.value, 635, row.y + 7, 208);
     });
+    drawArrowButton(476, 235, '‹');
+    drawArrowButton(770, 235, '›');
+    drawArrowButton(476, 312, '‹');
+    drawArrowButton(770, 312, '›');
+    drawArrowButton(476, 389, '‹');
+    drawArrowButton(770, 389, '›');
 
     // Nút xác nhận có mép sáng và bóng dập nổi.
-    pRect(ctx, 478, 475, 276, 61, 'rgba(37, 29, 29, 0.28)');
-    pOutlinedRect(ctx, 472, 468, 276, 61, '#e9bd67');
-    pOutlinedRect(ctx, 479, 475, 262, 47, '#547d4e');
+    pRect(ctx, 482, 495, 276, 61, 'rgba(37, 29, 29, 0.28)');
+    pOutlinedRect(ctx, 476, 488, 276, 61, '#e9bd67');
+    pOutlinedRect(ctx, 483, 495, 262, 47, '#547d4e');
     ctx.textAlign = 'center';
     ctx.fillStyle = '#fff6e4';
     ctx.font = "bold 18px 'Chakra Petch', sans-serif";
-    ctx.fillText('BẮT ĐẦU KHỞI NGHIỆP', 610, 505);
+    ctx.fillText('BẮT ĐẦU KHỞI NGHIỆP', 614, 525);
     ctx.fillStyle = '#ead9bd';
     ctx.font = "11px 'Chakra Petch', sans-serif";
-    ctx.fillText('MỌI HÀNH TRÌNH ĐỀU BẮT ĐẦU TỪ MỘT CON HẺM', 610, 554, 520);
+    ctx.fillText('MỌI HÀNH TRÌNH ĐỀU BẮT ĐẦU TỪ MỘT CON HẺM', 614, 565);
 }
 
 function drawIntro() {
@@ -9125,23 +9105,17 @@ function drawMinimalHUD(locationName) {
     ctx.fillText("💰 " + playerStats.money.toLocaleString('vi-VN') + " đ", 18, 23, 162);
 
     ctx.fillStyle = "#c84b31";
+    ctx.fillText(isMobileHUD ? `⚡${Math.round(playerStats.energy)}` : "⚡", 184, 23);
+    pOutlinedRect(ctx, 204, 11, 104, 14, "#b5a496");
     const eColor = playerStats.energy > 30 ? "#4f8a46" : "#e74c3c";
-    if (isMobileHUD) {
-        ctx.fillText(`⚡${Math.round(playerStats.energy)}`, 180, 23, 50);
-        pOutlinedRect(ctx, 234, 11, 76, 14, "#b5a496");
-        pRect(ctx, 236, 13, Math.max(0, (playerStats.energy / playerStats.maxEnergy) * 72), 10, eColor);
-    } else {
-        ctx.fillText("⚡", 184, 23);
-        pOutlinedRect(ctx, 204, 11, 104, 14, "#b5a496");
-        pRect(ctx, 206, 13, Math.max(0, (playerStats.energy / playerStats.maxEnergy) * 100), 10, eColor);
-    }
+    pRect(ctx, 206, 13, Math.max(0, (playerStats.energy / playerStats.maxEnergy) * 100), 10, eColor);
 
     // 2. Nút mở Sơ Đồ Khu Phố [M]
     pOutlinedRect(ctx, 324, 4, 126, 28, "#f0b643");
     ctx.fillStyle = PAL.OUTLINE;
     ctx.font = "bold 14px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(isMobileHUD ? "🗺️ Sơ đồ" : "🗺️ Sơ đồ [M]", 387, 23, 118);
+    ctx.fillText("🗺️ Sơ đồ [M]", 387, 23, 118);
 
     // 3. Kho nguyên liệu pha chế hiện tại (Cà phê, Sữa, Trái cây)
     pOutlinedRect(ctx, 456, 4, 252, 28, "rgba(236, 211, 171, 0.95)");
@@ -9180,7 +9154,7 @@ function drawMinimalHUD(locationName) {
     ctx.textAlign = "center";
     ctx.fillStyle = PAL.OUTLINE;
     ctx.font = "bold 13.5px 'Chakra Petch', sans-serif";
-    ctx.fillText(isMobileHUD ? "📖 Sổ tay" : "📖 Sổ tay [B]", 914, 59, 138);
+    ctx.fillText("📖 Sổ tay [B]", 914, 59, 138);
 
     pOutlinedRect(ctx, 10, 40, 300, 28, "#ecd3ab");
     ctx.fillStyle = PAL.OUTLINE;
@@ -12034,12 +12008,13 @@ let updateMobileControlsUI = () => {};
     let isTouchDevice = ('ontouchstart' in window) ||
         (navigator.maxTouchPoints > 0) ||
         Boolean(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    const userAgent = navigator.userAgent || '';
+    const isAndroid = /Android/i.test(userAgent);
+    const isIOS = /iPhone|iPad|iPod/i.test(userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     let manualMobilePad = false;
     let lastPadVisible = null;
-    let lastCharCreate = null;
     let lastLayoutKey = '';
-    let lastStableVw = 0;
-    let lastStableVh = 0;
 
     function isMobilePadEnabled() {
         return isTouchDevice || manualMobilePad;
@@ -12050,67 +12025,51 @@ let updateMobileControlsUI = () => {};
             !busScene && !showYearSummaryModal && !yearTwo.showTrailer;
     }
 
-    function syncMobileOverlayBounds() {
-        if (!canvas) return;
-        const rect = canvas.getBoundingClientRect();
-        if (!rect.height) return;
-        const actualScale = rect.height / 650;
-        const safeTop = Math.ceil(rect.top + 78 * actualScale);
-        document.documentElement.style.setProperty('--hud-safe-top', `${safeTop}px`);
-        const minGutter = Math.min(rect.left, window.innerWidth - rect.right);
-        document.body.classList.toggle('has-side-gutter', minGutter >= 76);
-    }
-
-    function syncFullscreenButtonState() {
-        const isFs = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
-        document.body.classList.toggle('is-fullscreen', isFs);
-        if (!btnFs) return;
-        const vw = window.visualViewport ? window.visualViewport.width : window.innerWidth;
-        const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-        const isLandscape = vw > vh;
-        btnFs.classList.toggle('active', isFs);
-        btnFs.textContent = isFs ? '⛶ Thu nhỏ' : (isLandscape ? '⛶ Toàn màn' : '⛶ Toàn màn hình');
-    }
-
     function updateResponsiveLayout() {
         const vw = window.visualViewport ? window.visualViewport.width : window.innerWidth;
         const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-        const activeTag = document.activeElement?.tagName;
-        if ((activeTag === 'INPUT' || activeTag === 'TEXTAREA') &&
-            lastStableVw > 0 && Math.abs(vw - lastStableVw) < 40 && vh < lastStableVh) {
-            return;
-        }
-        lastStableVw = vw;
-        lastStableVh = vh;
-
         const mobileOn = isMobilePadEnabled();
         const isLandscape = vw > vh;
         const showPadNow = mobileOn && isInGameplayForPad();
-        const isCharCreate = currentGameState === GAME_STATES.CHARACTER_CREATION;
 
         document.body.classList.toggle('is-mobile', mobileOn);
         document.body.classList.toggle('is-landscape', mobileOn && isLandscape);
         document.body.classList.toggle('is-portrait', mobileOn && !isLandscape);
-        document.body.classList.toggle('is-char-create', isCharCreate);
+        document.body.classList.toggle('is-android', mobileOn && isAndroid);
+        document.body.classList.toggle('is-ios', mobileOn && isIOS);
 
-        let availW = vw - (mobileOn ? 8 : 36);
-        let availH = vh - (mobileOn ? 8 : 36);
-        if (mobileOn && !isLandscape && showPadNow) {
-            // Chừa khoảng trống gọn bên dưới canvas cho tay cầm khi xoay dọc
-            availH = Math.max(210, vh - 204);
-        } else if (mobileOn && !isLandscape && isCharCreate) {
-            availH = Math.max(210, vh - 160);
+        const bodyStyle = getComputedStyle(document.body);
+        const bodyVerticalPadding = (parseFloat(bodyStyle.paddingTop) || 0) + (parseFloat(bodyStyle.paddingBottom) || 0);
+        const bodyHorizontalPadding = (parseFloat(bodyStyle.paddingLeft) || 0) + (parseFloat(bodyStyle.paddingRight) || 0);
+        const appGap = mobileOn && !isLandscape && showPadNow ? 10 : 0;
+        const padHeight = mobileOn && !isLandscape && showPadNow && mobileControls && !mobileControls.hidden
+            ? mobileControls.getBoundingClientRect().height
+            : 0;
+        const edgeSpace = mobileOn ? 2 : 28;
+        let sideRailSpace = 0;
+        if (mobileOn && isLandscape && showPadNow && mobileControls) {
+            const controlsRect = mobileControls.getBoundingClientRect();
+            const topbarRect = mobileControls.querySelector('.mobile-topbar')?.getBoundingClientRect();
+            const actionRect = mobileControls.querySelector('.action-cluster')?.getBoundingClientRect();
+            const joystickRect = joystickEl?.getBoundingClientRect();
+            const leftReach = Math.max(
+                joystickRect ? joystickRect.right - controlsRect.left : 0,
+                topbarRect ? topbarRect.right - controlsRect.left : 0
+            );
+            const rightReach = actionRect ? controlsRect.right - actionRect.left : 0;
+            sideRailSpace = Math.max(leftReach, rightReach) + 4;
         }
+        const availW = vw - edgeSpace - (mobileOn ? bodyHorizontalPadding : 0) - sideRailSpace * 2;
+        // Portrait: measure the actual control panel instead of reserving a fixed 204px.
+        // Landscape controls overlay the playfield, so they do not reduce its height.
+        const availH = vh - edgeSpace - (mobileOn ? bodyVerticalPadding + appGap + padHeight : 0);
         const scale = Math.max(0.28, Math.min(1, availW / 1000, availH / 650));
         mobileFontBoostPx = (mobileOn || scale < 0.85) ? (scale < 0.55 ? 2.5 : 1.5) : 0;
-        const key = `${scale.toFixed(4)}|${mobileOn}|${isLandscape}|${showPadNow}|${isCharCreate}`;
+        const key = `${scale.toFixed(4)}|${mobileOn}|${isLandscape}|${showPadNow}`;
         if (key !== lastLayoutKey) {
             lastLayoutKey = key;
             document.documentElement.style.setProperty('--game-scale', scale.toFixed(4));
         }
-        syncFullscreenButtonState();
-        syncMobileOverlayBounds();
-        requestAnimationFrame(syncMobileOverlayBounds);
     }
 
     function triggerVirtualKey(key) {
@@ -12133,18 +12092,6 @@ let updateMobileControlsUI = () => {};
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', updateResponsiveLayout);
     }
-    const handleFullscreenChange = () => {
-        syncFullscreenButtonState();
-        updateResponsiveLayout();
-        setTimeout(updateResponsiveLayout, 120);
-    };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    window.addEventListener('focusout', (e) => {
-        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
-            setTimeout(updateResponsiveLayout, 100);
-        }
-    });
 
     if (toggleBtn) {
         toggleBtn.addEventListener('click', () => {
@@ -12254,12 +12201,6 @@ let updateMobileControlsUI = () => {};
 
     let lastUiSig = '';
     updateMobileControlsUI = function () {
-        const isCharCreate = currentGameState === GAME_STATES.CHARACTER_CREATION;
-        if (isCharCreate !== lastCharCreate) {
-            lastCharCreate = isCharCreate;
-            document.body.classList.toggle('is-char-create', isCharCreate);
-            updateResponsiveLayout();
-        }
         if (!mobileControls) return;
         const visible = isMobilePadEnabled() && isInGameplayForPad();
         if (visible !== lastPadVisible) {
@@ -12320,7 +12261,7 @@ let updateMobileControlsUI = () => {};
         const gLabel = coffeeCart.isPushed ? '🅿️ Đậu xe' : '🛒 Đẩy xe';
         const cLabel = coffeeCart.isOpen ? '🔒 Đóng xe' : '☕ Mở xe';
 
-        const sig = `${onStreet}|${showF}|${showK}|${showH}|${showC}|${eLabel}|${eHighlight}|${qLabel}|${gLabel}|${cLabel}|${coffeeCart.isPushed}|${showGarage}|${showDeliveryModal}|${showManagementModal}`;
+        const sig = `${onStreet}|${showF}|${showK}|${showH}|${showC}|${eLabel}|${eHighlight}|${qLabel}|${gLabel}|${cLabel}|${coffeeCart.isPushed}`;
         if (sig === lastUiSig) return;
         lastUiSig = sig;
 
@@ -12338,18 +12279,9 @@ let updateMobileControlsUI = () => {};
             btnC.hidden = !showC;
             btnC.textContent = cLabel;
         }
-        if (btnV) {
-            btnV.hidden = !onStreet;
-            btnV.classList.toggle('active', showGarage);
-        }
-        if (btnF) {
-            btnF.hidden = !showF;
-            btnF.classList.toggle('active', showDeliveryModal);
-        }
-        if (btnK) {
-            btnK.hidden = !showK;
-            btnK.classList.toggle('active', showManagementModal);
-        }
+        if (btnV) btnV.hidden = !onStreet;
+        if (btnF) btnF.hidden = !showF;
+        if (btnK) btnK.hidden = !showK;
         if (btnH) btnH.hidden = !showH;
     };
 
