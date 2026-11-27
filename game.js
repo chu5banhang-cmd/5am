@@ -9093,6 +9093,8 @@ function drawDayNightLightingOverlay() {
 
 function drawMinimalHUD(locationName) {
     const isMobileHUD = document.body.classList.contains('is-mobile');
+    ctx.save();
+    if (isMobileHUD) ctx.scale(1, 1.08);
     if (isMobileHUD) {
         // One shared backplate makes the separate pixel panels read as a single HUD.
         pOutlinedRect(ctx, 4, 0, canvas.width - 8, 72, "rgba(43, 29, 22, 0.78)");
@@ -9178,6 +9180,7 @@ function drawMinimalHUD(locationName) {
         ctx.textAlign = "right";
         ctx.fillText("📍 " + locationName, canvas.width - 20, canvas.height - 18, 294);
     }
+    ctx.restore();
 }
 
 // ============================================================================
@@ -12004,6 +12007,8 @@ let updateMobileControlsUI = () => {};
     const btnK = document.getElementById('btnTouchK');
     const btnH = document.getElementById('btnTouchH');
     const btnFs = document.getElementById('btnTouchFullscreen');
+    const mobileTopbar = mobileControls?.querySelector('.mobile-topbar');
+    const actionSecondaryRow = mobileControls?.querySelector('.action-secondary-row');
 
     let isTouchDevice = ('ontouchstart' in window) ||
         (navigator.maxTouchPoints > 0) ||
@@ -12038,6 +12043,15 @@ let updateMobileControlsUI = () => {};
         document.body.classList.toggle('is-android', mobileOn && isAndroid);
         document.body.classList.toggle('is-ios', mobileOn && isIOS);
 
+        // Landscape fullscreen: move utility buttons into the bottom action dock.
+        const moveUtilityButtonsToDock = mobileOn && isLandscape;
+        const landscapeTarget = moveUtilityButtonsToDock ? actionSecondaryRow : mobileTopbar;
+        [btnV, btnF, btnK, btnFs].forEach((button) => {
+            if (!button || !landscapeTarget || button.parentElement === landscapeTarget) return;
+            if (moveUtilityButtonsToDock) landscapeTarget.appendChild(button);
+            else landscapeTarget.insertBefore(button, btnFs?.parentElement === landscapeTarget ? btnFs : null);
+        });
+
         const bodyStyle = getComputedStyle(document.body);
         const bodyVerticalPadding = (parseFloat(bodyStyle.paddingTop) || 0) + (parseFloat(bodyStyle.paddingBottom) || 0);
         const bodyHorizontalPadding = (parseFloat(bodyStyle.paddingLeft) || 0) + (parseFloat(bodyStyle.paddingRight) || 0);
@@ -12046,20 +12060,7 @@ let updateMobileControlsUI = () => {};
             ? mobileControls.getBoundingClientRect().height
             : 0;
         const edgeSpace = mobileOn ? 2 : 28;
-        let sideRailSpace = 0;
-        if (mobileOn && isLandscape && showPadNow && mobileControls) {
-            const controlsRect = mobileControls.getBoundingClientRect();
-            const topbarRect = mobileControls.querySelector('.mobile-topbar')?.getBoundingClientRect();
-            const actionRect = mobileControls.querySelector('.action-cluster')?.getBoundingClientRect();
-            const joystickRect = joystickEl?.getBoundingClientRect();
-            const leftReach = Math.max(
-                joystickRect ? joystickRect.right - controlsRect.left : 0,
-                topbarRect ? topbarRect.right - controlsRect.left : 0
-            );
-            const rightReach = actionRect ? controlsRect.right - actionRect.left : 0;
-            sideRailSpace = Math.max(leftReach, rightReach) + 4;
-        }
-        const availW = vw - edgeSpace - (mobileOn ? bodyHorizontalPadding : 0) - sideRailSpace * 2;
+        const availW = vw - edgeSpace - (mobileOn ? bodyHorizontalPadding : 0);
         // Portrait: measure the actual control panel instead of reserving a fixed 204px.
         // Landscape controls overlay the playfield, so they do not reduce its height.
         const availH = vh - edgeSpace - (mobileOn ? bodyVerticalPadding + appGap + padHeight : 0);

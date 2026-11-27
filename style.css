@@ -500,15 +500,7 @@ body.is-mobile.is-landscape #mobileControls {
 }
 
 body.is-mobile.is-landscape .mobile-topbar {
-    position: absolute;
-    top: max(8px, env(safe-area-inset-top, 8px));
-    left: max(8px, env(safe-area-inset-left, 8px));
-    width: min(108px, 14vw);
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: center;
-    gap: 6px;
-    padding: 0;
+    display: none;
 }
 
 /* Map and handbook are already tappable in the canvas HUD. */
@@ -524,6 +516,10 @@ body.is-mobile.is-landscape .action-cluster button {
 }
 
 body.is-mobile.is-landscape .mobile-pad-row {
+    position: absolute;
+    left: max(8px, env(safe-area-inset-left, 8px));
+    right: max(8px, env(safe-area-inset-right, 8px));
+    bottom: max(8px, env(safe-area-inset-bottom, 8px));
     align-items: flex-end;
     gap: 6px;
     padding: 0 4px 4px;
@@ -542,19 +538,48 @@ body.is-mobile.is-landscape #touchJoystickKnob {
 }
 
 body.is-mobile.is-landscape .action-cluster {
-    width: min(108px, 14vw);
-    max-width: min(108px, 14vw);
-    align-items: stretch;
+    width: min(52vw, 480px);
+    max-width: min(52vw, 480px);
+    align-items: flex-end;
     gap: 6px;
     opacity: 0.94;
 }
 
 body.is-mobile.is-landscape .action-secondary-row,
 body.is-mobile.is-landscape .action-primary-row {
-    flex-direction: column;
-    flex-wrap: nowrap;
-    gap: 5px;
+    display: grid;
+    gap: 6px;
 }
+
+body.is-mobile.is-landscape .action-secondary-row {
+    width: min(52vw, 480px);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: stretch;
+}
+
+body.is-mobile.is-landscape .action-primary-row {
+    width: min(30vw, 280px);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+}
+
+body.is-mobile.is-landscape .action-secondary-row > button {
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    padding: 4px 2px;
+    font-size: clamp(9px, 1.8vh, 11px);
+    line-height: 1.05;
+    white-space: normal;
+}
+
+body.is-mobile.is-landscape #btnTouchG { order: 1; }
+body.is-mobile.is-landscape #btnTouchC { order: 2; }
+body.is-mobile.is-landscape #btnTouchV { order: 3; }
+body.is-mobile.is-landscape #btnTouchF { order: 4; }
+body.is-mobile.is-landscape #btnTouchK { order: 5; }
+body.is-mobile.is-landscape #btnTouchH { order: 6; }
+body.is-mobile.is-landscape #btnTouchFullscreen { order: 7; }
 
 body.is-mobile.is-landscape .touch-chip {
     width: 100%;
@@ -568,15 +593,15 @@ body.is-mobile.is-landscape .touch-chip {
 body.is-mobile.is-landscape .touch-btn-main {
     min-width: 0;
     width: 100%;
-    min-height: 42px;
-    padding: 7px 6px;
+    min-height: 44px;
+    padding: 8px 8px;
     font-size: clamp(11px, 2.4vh, 13px);
 }
 
 body.is-mobile.is-landscape .touch-btn-close {
     width: 100%;
-    min-height: 42px;
-    padding: 6px;
+    min-height: 44px;
+    padding: 7px 8px;
     font-size: clamp(10px, 2.2vh, 12px);
 }
 
@@ -637,9 +662,9 @@ body.is-mobile.is-landscape.is-android #touchJoystickKnob {
 }
 
 body.is-mobile.is-landscape.is-android .action-cluster {
-    width: min(108px, 14vw);
-    max-width: min(108px, 14vw);
-    align-items: stretch;
+    width: min(52vw, 480px);
+    max-width: min(52vw, 480px);
+    align-items: flex-end;
     gap: 7px;
     opacity: 0.95;
 }
@@ -659,7 +684,7 @@ body.is-mobile.is-landscape.is-android .touch-btn-main,
 body.is-mobile.is-landscape.is-android .touch-btn-close,
 body.is-mobile.is-landscape.is-android .touch-btn-sub {
     width: 100%;
-    min-height: 42px;
+    min-height: 44px;
     padding: 8px 10px;
     font-size: clamp(12px, 2.6vh, 14px);
 }
